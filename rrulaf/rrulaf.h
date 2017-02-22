@@ -7,8 +7,7 @@
 
 #include "../ur_modern_driver-master/include/ur_driver.h"
 #include "../kinematics/ur_kin.h"
-//#include "../vision/vision.h"
-//#include "../force/force.h"
+#include "../force/force.h"
 
 
 
@@ -37,8 +36,6 @@
 
 void getq(UrDriver *ur5, std::condition_variable *rt_msg_cond_, double q[6]);
 void RobotWait(UrDriver *ur5, std::condition_variable *rt_msg_cond_, double pose_target[6]);
-//void GripperControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int gripPos);
-//void GripperSpeedControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int gripPos);
 //void upBack(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int up);
 //void moveValve(UrDriver *ur5, std::condition_variable *rt_msg_cond_, std::vector<cv::Vec3f> *circles, cv::Point2f *hexPoint, double BoltWorld[3], int *successDetect);
 void moveSimpleJoint(UrDriver *ur5, std::condition_variable *rt_msg_cond_, double T06[16], int angle_offset, double v, double a);

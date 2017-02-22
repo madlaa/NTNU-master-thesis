@@ -1,3 +1,9 @@
+/*Written by Mads Johan Laastad as part of a master thesis in Cybernetics and Robotics at the Norwegian University of Science and Technology (NTNU) during the spring of 2017. The author can not guarrantee for the safety of anyone that desides to use this code in their own projects. This module is named rrulaf after the title of the master thesis it is part of, rrulaf is an acronyme for "Robotic Rehabilitation of Upper-Limb After Stroke". Feel free to contact the autor at laastad.m@gmail.com if you have any questions.
+# NETWORK
+#
+# The IP address can be found in the PolyScope interface (tablet) of the robot.
+# SETUP Robot -> Setup NETWORK (requires password: "ngr12") -> IP address
+*/
 #include "rrulaf.h"
 
 void getq(UrDriver *ur5, std::condition_variable *rt_msg_cond_, double q[6])
@@ -49,19 +55,6 @@ void RobotWait(UrDriver *ur5, std::condition_variable *rt_msg_cond_, double pose
     usleep(1000000);
 }
 /*
-void GripperControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int gripPos)
-{
-    char closeGrip[200];
-    sprintf(closeGrip, "modbus_set_output_register(\"Position_Req\", %.3d, False)\n", gripPos);
-    ur5->rt_interface_->addCommandToQueue(closeGrip);
-}
-
-void GripperSpeedControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int gripPos)
-{
-    char closeGrip[200];
-    sprintf(closeGrip, "modbus_set_output_register(\"Speed_Force_Req\", %.3d, False)\n", gripPos);
-    ur5->rt_interface_->addCommandToQueue(closeGrip);
-}
 
 void upBack(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int up, double up_value, double back_value)
 {
@@ -299,48 +292,25 @@ int main()
     std::cout << "Data received!" << std::endl;
     
     
-    /*
-    GripperSpeedControl(&ur5, &rt_msg_cond_, 40000);
-    usleep(50000);
-    GripperControl(&ur5, &rt_msg_cond_, 50);
-    usleep(50000);
-    */
-    //gsl_vector *x = gsl_vector_alloc(6);
-    /*
-    int i, j; 
-    gsl_matrix * m = gsl_matrix_alloc (10, 3);
-
-    for (i = 0; i < 10; i++)
-      for (j = 0; j < 3; j++)
-        gsl_matrix_set (m, i, j, 0.23 + 100*i + j);
-
-    for (i = 0; i < 100; i++)  // OUT OF RANGE ERROR 
-      for (j = 0; j < 3; j++)
-        printf ("m(%d,%d) = %g\n", i, j, 
-              gsl_matrix_get (m, i, j));
-
-    gsl_matrix_free (m);
-    gsl_vector *x;
-    std::cout << "gsl_vector is set to: " << &x << std::endl;
-    */
-    /*
+    
     // APPROX. START LOCATIONS
-    double qStart[6] = {0.0313, -2.6049, -1.1329, 0.5415, 1.4320, 0.6055}; 
+    double qStart[6] = {0.0313, -2.6049, -1.1329, 0.5415, 1.4320, 0.6555}; 
     //Approximate starting position
     //double qTool[6] = {1.33906, -0.967229, 0.397516, 0.565406, -0.235619, 2.98923};
-    double q[6];
+    /*double q[6];
     getq(&ur5, &rt_msg_cond_, q);    
     char TargetString[200];
     sprintf(TargetString, "movel([%.4f, %.4f, %.4f, %.4f, %.4f, %.4f], %.4f, %.4f)\n", q[0], q[1], q[2], q[3], q[4], q[5], 0.2, 0.2);
     std::cout << "Current pose is: " << TargetString << std::endl;
+    */
     // MOVE TO STARING POINT
     moveSimpleJointDirect(&ur5, &rt_msg_cond_, qStart, 0.2, 0.2);
     //qStart[1] = qStart[1]+0.01;
-    double T06_TOOL_75[6] = {0.0413, -2.6049, -1.1329, 0.5415, 1.4320, 0.6055};
-    std::cout << "Moving a bit... " << std::endl;
+    //double T06_TOOL_75[6] = {0.0413, -2.6049, -1.1329, 0.5415, 1.4320, 0.6055};
+    //std::cout << "Moving a bit... " << std::endl;
     //moveSimpleJoint(&ur5, &rt_msg_cond_, qStart, 0, 0.2, 0.2);
-    moveSimpleJointDirect(&ur5, &rt_msg_cond_, T06_TOOL_75, 0.5, 0.5);
-	*/
+    //moveSimpleJointDirect(&ur5, &rt_msg_cond_, T06_TOOL_75, 0.5, 0.5);
+
     /*
     std::vector<cv::Vec3f> circles;
     cv::Point2f hexPoint;
@@ -487,20 +457,20 @@ int main()
 	    
 	 
 	    
-	    
-	    
+	    */
 	    // FORCE CONTROL
+	    std::cout << "Initializing force control. \n";
 	    pthread_t forceID;
 	    startFT(&forceID);
 	    
-	    forceControl(&ur5, &rt_msg_cond_, 5, 2, 5.0);
-	    forceControl(&ur5, &rt_msg_cond_, 20, 1, 5.0);
-	    
+	    simpleForceControl(&ur5, &rt_msg_cond_, 200, 1, 0.5);//forceControl(&ur5, &rt_msg_cond_, 5, 2, 5.0);
+	    //forceControl(&ur5, &rt_msg_cond_, 20, 1, 5.0);
+	    usleep(10000);
 	    stopFT(&forceID);
+	    std::cout << "Shutting down force control. \n";
 	    
 	    
 	    
-	    */
 	    /*
 
 	    // PLACE TOOL
