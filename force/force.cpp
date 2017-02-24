@@ -4,7 +4,9 @@
 #include "ufwdkin_c.c"
 
 int initFT = 1;
+int forceSleepTime = 800; //usleep830 ~ 1200 Hz --> run a bit faster than FT broadcast frequency -- currently 1000 Hz
 double rawFTdata[6];
+
 
 void *getFTData(void *arg)
 {
@@ -101,7 +103,7 @@ void forceTransformation(double ft_in[3], double ft_out[3])
 	/*
 	double theta = 2.2328;
 	double rot[9];
-	rot_z(theta, rot); //Replace?
+	rot_z(theta, rot); //Replace? Wants rotation around Z-axis
 
 	double ft_wrist[4];
 	ft_wrist[0] = rot[0]*ft_in[0] + rot[1]*ft_in[1] + rot[2]*ft_in[2]; 
@@ -180,7 +182,7 @@ void solveInverseJacobian(std::vector<double> q, double vw[6], double qd[6])
 }
 
 
-void adjustForce(double sq6, double cq6, double outF[3])
+void adjustForce(double sq6, double cq6, double outF[3]) //Adjusting for weight of equptment?
 {
 	double magX = -11.4048;
 	double magY = -11.4560;
@@ -196,42 +198,34 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 
 
 	pthread_t forceID;
-	startFT(&forceID); //Results in two threads reading F/T data
+	startFT(&forceID);
   
 	std::cout << "Force control initiated - starting compliance mode ...\n";
 	std::ofstream forcelog;
 	forcelog.open("../data/logs/forcelog", std::ofstream::out);
 	//Control system for translation forces
-	double integrator_Fx = 0;
-	double integrator_Fy = 0;
-	double integrator_Fz = 0;
-  
+	double integrator_Fx = 0, integrator_Fy = 0, integrator_Fz = 0;
+	double derivator_Fx = 0, derivator_Fy = 0, derivator_Fz = 0;
 	double Kp = -0.005; //Doublecheck PI controller tuning
 	double Ki = -0.000025;
+	double Kd = -0.000025;
 	
-	double error_Fx = 0;
-	double error_Fy = 0;
-	double error_Fz = 0;
+	double error_Fx = 0, error_Fy = 0, error_Fz = 0;
+	double prior_error_Fx = 0, prior_error_Fy = 0, prior_error_Fz = 0;
 	
-	double u_Fx = 0;
-	double u_Fy = 0;
-	double u_Fz = 0;
+	double u_Fx = 0; double u_Fy = 0; double u_Fz = 0;
 	
 	//Control system for rotational forces
-	double integrator_Tx = 0;
-	double integrator_Ty = 0;
-	double integrator_Tz = 0;
-  
-	double Kp_T = -0.005; //Doublecheck PI controller tuning
-	double Ki_T = -0.000025;
+	//TODo: Add Kd and Kd_T to make a PID controller. Compare results with PI. 
+	//ToDo: Add threshold force referance. Remove F/T Bias at the F/T Net Box interface.
+	double integrator_Tx = 0, integrator_Ty = 0, integrator_Tz = 0;
+	//Doublecheck PI controller tuning 
+	double Kp_T = -0.005; //Original: -0.005;
+	double Ki_T = -0.000025; //Original: -0.000025;
 	
-	double error_Tx = 0;
-	double error_Ty = 0;
-	double error_Tz = 0;
+	double error_Tx = 0, error_Ty = 0, error_Tz = 0;
 	
-	double u_Tx = 0;
-	double u_Ty = 0;
-	double u_Tz = 0;
+	double u_Tx = 0, u_Ty = 0, u_Tz = 0;
 	
 	double speed[6] = {0,0,0,0,0,0};
 	
@@ -264,7 +258,7 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 
 	
 	double startTime = ur5->rt_interface_->robot_state_->getTime();
-	std::vector<double> sq = ur5->rt_interface_->robot_state_->getQActual();
+	std::vector<double> sq = ur5->rt_interface_->robot_state_->getQActual(); //Start Q
 	
 	int i = 0; 
 	int iter = run_time/0.008;
@@ -286,9 +280,10 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 			rt_msg_cond_->wait(locker);
 		}
 
-
+		
 
 		double Torques[3] = {rawFTdata[3]-biasTorque[3], rawFTdata[4]-biasTorque[4], rawFTdata[5]-biasTorque[5]};
+		double Forces[3] = {rawFTdata[0]-biasFT[0], rawFTdata[1]-biasFT[1], rawFTdata[2]-biasFT[2]};
 		
 		double timeStamp = ur5->rt_interface_->robot_state_->getTime();
 		double elapsTime = timeStamp-startTime;
@@ -303,7 +298,7 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 		
 		
 		double current_TCP_Frame_adjusted[3];
-		adjustForce(sq[5], q[5], current_TCP_Frame_adjusted);
+		adjustForce(sq[5], q[5], current_TCP_Frame_adjusted); // Used for compansating force indused by the equiptment? Remove?
 		double new_TCP_Frame[3];
 		for(int j=0; j<3; j++)
 		{
@@ -316,46 +311,74 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 		error_Fy = ref_TCP_Frame[1]-new_TCP_Frame[1];
    		error_Fz = ref_TCP_Frame[2]-new_TCP_Frame[2];
    		*/
-   		error_Fx = rawFTdata[0]-biasFT[0];//rawFTdata[0];
-		error_Fy = rawFTdata[1]-biasFT[1];//rawFTdata[1];
-   		error_Fz = rawFTdata[2]-biasFT[2];//rawFTdata[2];
+   		
+   		//Only update error if one of the forces exeedes a given threshhold (badly implemented low-pass filer)
+   		//Vibrations in the manipulator transends to the end effector and gets interpeted as new inputs without this lowpass filter
+   		if(fabs(Forces[0]) > 1 || fabs(Forces[1]) > 1 || fabs(Forces[2]) > 1)
+   		{
+			error_Fx = Forces[0];
+			error_Fy = Forces[1];
+			error_Fz = Forces[2];
+			
+			error_Tx = Torques[0];
+			error_Ty = Torques[1];
+	   		error_Tz = Torques[2];
+			
+		}
+		else
+		{
+			error_Fx = 0;
+			error_Fy = 0;
+			error_Fz = 0;
+			
+			error_Tx = 0;
+			error_Ty = 0;
+	   		error_Tz = 0;
+	   		
+			integrator_Fx = 0;
+			integrator_Fy = 0;
+			integrator_Fz = 0;
+			
+			integrator_Tx = 0;
+			integrator_Ty = 0;
+			integrator_Tz = 0;
+		}
+
 		
-		error_Tx = rawFTdata[3]-biasTorque[3];//Torques[0];
-		error_Ty = rawFTdata[4]-biasTorque[4];//Torques[1];
-   		error_Tz = rawFTdata[5]-biasTorque[5];//Torques[2];
-		
-		
-		if(fabs(error_Fx) > 30 || fabs(error_Fy) > 30 || fabs(error_Fz) > 30)
+		if(fabs(error_Fx) > 50 || fabs(error_Fy) > 50 || fabs(error_Fz) > 50)
 		{
 			ur5->setSpeed(0,0,0,0,0,0,1);
 			std::cout << "Force levels too large - stopping control!" << std::endl;
 			break;
 		}
 		
-		
-		
 		//Controller
 		integrator_Fx = integrator_Fx + error_Fx;
 		integrator_Fy = integrator_Fy + error_Fy;
 		integrator_Fz = integrator_Fz + error_Fz;
+		
+		derivator_Fx = error_Fx - prior_error_Fx;
+		derivator_Fy = error_Fy - prior_error_Fy;
+		derivator_Fz = error_Fz - prior_error_Fz;
 		
 		integrator_Tx = integrator_Tx + error_Tx;
 		integrator_Ty = integrator_Ty + error_Ty;
 		integrator_Tz = integrator_Tz + error_Tz;
 		
 		
-		u_Fx = Kp*error_Fx + Ki*integrator_Fx;
-		u_Fy = Kp*error_Fy + Ki*integrator_Fy;
-		u_Fz = Kp*error_Fz + Ki*integrator_Fz;
+		u_Fx = Kp*error_Fx + Ki*integrator_Fx + Kd*derivator_Fx;
+		u_Fy = Kp*error_Fy + Ki*integrator_Fy + Kd*derivator_Fy;
+		u_Fz = Kp*error_Fz + Ki*integrator_Fz + Kd*derivator_Fz;
 		
 		u_Tx = Kp_T*error_Tx + Ki_T*integrator_Tx;
 		u_Ty = Kp_T*error_Ty + Ki_T*integrator_Ty;
 		u_Tz = Kp_T*error_Tz + Ki_T*integrator_Tz;
 		
-		if(rotation_on == 1)
+		//Set different modes to exert a different rehabilitation strategy
+		if(rotation_on == 1) // Compliance mode
 		{
-			vw[0] = u_Fx;
-			vw[1] = u_Fy, 
+			vw[0] = u_Fy; //The mounting of the F/T sensor require some adjustments to the TCP <-> FT frames
+			vw[1] = -u_Fx, 
 			vw[2] = -u_Fz; 
 			vw[3] = 0;//u_Tx;
 			vw[4] = 0;//u_Ty;
@@ -391,12 +414,15 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 	
 	
 		solveInverseJacobian(q, vw, speed);
-	
-	
-		//std::cout << "Does this compute? ...\n";
+		
+		
 		ur5->rt_interface_->robot_state_->setDataPublished();
-		ur5->setSpeed(speed[0], speed[1], speed[2], speed[3], speed[4], speed[5], 1);
-	
+		ur5->setSpeed(speed[0], speed[1], speed[2], speed[3], speed[4], speed[5], 15);
+		
+		
+		prior_error_Fx = error_Fx; 
+		prior_error_Fy = error_Fy;
+		prior_error_Fz = error_Fz;
 		//std::cout << elapsTime << "\t" << i << std::endl;
 		//std::cout << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << "\n";
 	
@@ -405,8 +431,13 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 		
 		
 		i=i+1;
+		usleep(forceSleepTime);
+		
+		
 	}	
+	
 	//stopFT(&forceID);
+	
 	forcelog.close();
 }
 

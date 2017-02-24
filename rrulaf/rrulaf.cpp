@@ -3,42 +3,44 @@
 #
 # The IP address can be found in the PolyScope interface (tablet) of the robot.
 # SETUP Robot -> Setup NETWORK (requires password: "ngr12") -> IP address
+UR5_IP = "10.42.0.63"
+UR5_HOSTNAME = 'ur-2012208984' #requires dns.
 */
 #include "rrulaf.h"
 
 void getq(UrDriver *ur5, std::condition_variable *rt_msg_cond_, double q[6])
 {
-    std::mutex msg_lock;
-    std::unique_lock<std::mutex> locker(msg_lock);
-    while (!ur5->rt_interface_->robot_state_->getDataPublished())
-    {
+	std::mutex msg_lock;
+	std::unique_lock<std::mutex> locker(msg_lock);
+	while (!ur5->rt_interface_->robot_state_->getDataPublished())
+	{
 	rt_msg_cond_->wait(locker);
-    }
-    std::vector<double> q_vector = ur5->rt_interface_->robot_state_->getQActual();
-    std::copy(q_vector.begin(), q_vector.end(), q);
-    ur5->rt_interface_->robot_state_->setDataPublished();
+	}
+	std::vector<double> q_vector = ur5->rt_interface_->robot_state_->getQActual();
+	std::copy(q_vector.begin(), q_vector.end(), q);
+	ur5->rt_interface_->robot_state_->setDataPublished();
 }
 
 void RobotWait(UrDriver *ur5, std::condition_variable *rt_msg_cond_, double pose_target[6])
 {
-    struct timeval tp;
-    gettimeofday(&tp, NULL);
-    double startTime = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-    double goal_tol = 0.0075;  
-    while(1)
-    {
+	struct timeval tp;
+	gettimeofday(&tp, NULL);
+	double startTime = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+	double goal_tol = 0.0075;  
+	while(1)
+	{
 	gettimeofday(&tp, NULL);
 	double timeStamp = tp.tv_sec * 1000 + tp.tv_usec / 1000;
 	double elapsTime = (timeStamp-startTime)/1000;
-      
-        std::mutex msg_lock;
+	  
+		std::mutex msg_lock;
 	std::unique_lock<std::mutex> locker(msg_lock);
 	while (!ur5->rt_interface_->robot_state_->getDataPublished())
 	{
-	    rt_msg_cond_->wait(locker);
+		rt_msg_cond_->wait(locker);
 	}
-        ur5->rt_interface_->robot_state_->setDataPublished();
-        std::vector<double> q_actual = ur5->rt_interface_->robot_state_->getQActual();
+		ur5->rt_interface_->robot_state_->setDataPublished();
+		std::vector<double> q_actual = ur5->rt_interface_->robot_state_->getQActual();
 	if(((fabs(q_actual[0] - pose_target[0])) < goal_tol) &&
 	   ((fabs(q_actual[1] - pose_target[1])) < goal_tol) &&
 	   ((fabs(q_actual[2] - pose_target[2])) < goal_tol) &&
@@ -51,23 +53,23 @@ void RobotWait(UrDriver *ur5, std::condition_variable *rt_msg_cond_, double pose
 	  std::cout << "RobotWait is stuck - breaking out!" << std::endl;
 	  break;
 	}
-    }
-    usleep(1000000);
+	}
+	usleep(1000000);
 }
 /*
 
 void upBack(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int up, double up_value, double back_value)
 {
-    if(up == 1)
-    {
+	if(up == 1)
+	{
 	// UP
 	std::mutex msg_lock;
 	std::unique_lock<std::mutex> locker(msg_lock);
 	while (!ur5->rt_interface_->robot_state_->getDataPublished())
 	{
-	    rt_msg_cond_->wait(locker);
+		rt_msg_cond_->wait(locker);
 	}
-        ur5->rt_interface_->robot_state_->setDataPublished();
+		ur5->rt_interface_->robot_state_->setDataPublished();
 	double qU[6];
 	getq(ur5, rt_msg_cond_, qU);
 	double T06U[16];
@@ -80,53 +82,53 @@ void upBack(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int up, double
 		qGoalU[0], qGoalU[1], qGoalU[2], qGoalU[3], qGoalU[4], qGoalU[5], 0.05, 0.05);
 	ur5->rt_interface_->addCommandToQueue(TargetU);  
 	RobotWait(ur5, rt_msg_cond_, qGoalU);
-    }
-    
-    // BACK
-    std::mutex msg_lock;
-    std::unique_lock<std::mutex> locker(msg_lock);
-    while (!ur5->rt_interface_->robot_state_->getDataPublished())
-    {
-	rt_msg_cond_->wait(locker);
-    }
-    ur5->rt_interface_->robot_state_->setDataPublished();
-    double qB[6];
-    getq(ur5, rt_msg_cond_, qB);
-    double T06B[16];
-    ur_kinematics::forward(qB, T06B);
-    T06B[3] = T06B[3]-back_value;
-    double qGoalB[6];
-    getnearest(T06B, qB, qGoalB);
-    char TargetB[200];
-    sprintf(TargetB, "movel([%.4f, %.4f, %.4f, %.4f, %.4f, %.4f], %.4f, %.4f)\n",
-            qGoalB[0], qGoalB[1], qGoalB[2], qGoalB[3], qGoalB[4], qGoalB[5], 0.05, 0.05);
-    ur5->rt_interface_->addCommandToQueue(TargetB);
-    RobotWait(ur5, rt_msg_cond_, qGoalB);
-}*/
-/*
-void moveValve(UrDriver *ur5, std::condition_variable *rt_msg_cond_, std::vector<cv::Vec3f> *circles, cv::Point2f *hexPoint, double BoltWorld[3], int *successDetect)
-{
-    int tempRadius = 0;
-    int indexMAX;
-    for(unsigned int j = 0; j < circles->size(); j++)
-    {
-	if((*circles)[j][2] > tempRadius)
-	{
-	    tempRadius = (*circles)[j][2];
-	    cv::Point2f BoltCenter(cvRound((*circles)[j][0]), cvRound((*circles)[j][1]));
-	    *successDetect = 1;
-	    indexMAX = j;
 	}
-    }
-    if(*successDetect == 1)
-    {
+	
+	// BACK
 	std::mutex msg_lock;
 	std::unique_lock<std::mutex> locker(msg_lock);
 	while (!ur5->rt_interface_->robot_state_->getDataPublished())
 	{
-	    rt_msg_cond_->wait(locker);
+	rt_msg_cond_->wait(locker);
 	}
-        ur5->rt_interface_->robot_state_->setDataPublished();
+	ur5->rt_interface_->robot_state_->setDataPublished();
+	double qB[6];
+	getq(ur5, rt_msg_cond_, qB);
+	double T06B[16];
+	ur_kinematics::forward(qB, T06B);
+	T06B[3] = T06B[3]-back_value;
+	double qGoalB[6];
+	getnearest(T06B, qB, qGoalB);
+	char TargetB[200];
+	sprintf(TargetB, "movel([%.4f, %.4f, %.4f, %.4f, %.4f, %.4f], %.4f, %.4f)\n",
+			qGoalB[0], qGoalB[1], qGoalB[2], qGoalB[3], qGoalB[4], qGoalB[5], 0.05, 0.05);
+	ur5->rt_interface_->addCommandToQueue(TargetB);
+	RobotWait(ur5, rt_msg_cond_, qGoalB);
+}*/
+/*
+void moveValve(UrDriver *ur5, std::condition_variable *rt_msg_cond_, std::vector<cv::Vec3f> *circles, cv::Point2f *hexPoint, double BoltWorld[3], int *successDetect)
+{
+	int tempRadius = 0;
+	int indexMAX;
+	for(unsigned int j = 0; j < circles->size(); j++)
+	{
+	if((*circles)[j][2] > tempRadius)
+	{
+		tempRadius = (*circles)[j][2];
+		cv::Point2f BoltCenter(cvRound((*circles)[j][0]), cvRound((*circles)[j][1]));
+		*successDetect = 1;
+		indexMAX = j;
+	}
+	}
+	if(*successDetect == 1)
+	{
+	std::mutex msg_lock;
+	std::unique_lock<std::mutex> locker(msg_lock);
+	while (!ur5->rt_interface_->robot_state_->getDataPublished())
+	{
+		rt_msg_cond_->wait(locker);
+	}
+		ur5->rt_interface_->robot_state_->setDataPublished();
 	
 	double q[6];
 	getq(ur5, rt_msg_cond_, q);
@@ -153,119 +155,119 @@ void moveValve(UrDriver *ur5, std::condition_variable *rt_msg_cond_, std::vector
 	ur5->rt_interface_->addCommandToQueue(TargetPoseBolt);  
 	RobotWait(ur5, rt_msg_cond_, qBoltGoal);
 	
-    }
-    else
-    {
+	}
+	else
+	{
 	std::cout << "Valve is not detected!" << std::endl;
-    }
+	}
 }
 */  
 void moveSimpleJoint(UrDriver *ur5, std::condition_variable *rt_msg_cond_, double T06[16], int angle_offset, double v, double a)
 {
-    std::mutex msg_lock;
-    std::unique_lock<std::mutex> locker(msg_lock);
-    while (!ur5->rt_interface_->robot_state_->getDataPublished())
-    {
+	std::mutex msg_lock;
+	std::unique_lock<std::mutex> locker(msg_lock);
+	while (!ur5->rt_interface_->robot_state_->getDataPublished())
+	{
 	rt_msg_cond_->wait(locker);
-    }
-    ur5->rt_interface_->robot_state_->setDataPublished();
-    
-    double q[6];  
-    getq(ur5, rt_msg_cond_, q);
-    double qGoal[6];
-    getnearest(T06, q, qGoal);
-    qGoal[5] = qGoal[5]-((angle_offset+TCP_OFFSET)*M_PI/180);
-    char TargetString[200];
-    sprintf(TargetString, "movej([%.4f, %.4f, %.4f, %.4f, %.4f, %.4f], %.4f, %.4f)\n",
-	    qGoal[0], qGoal[1], qGoal[2], qGoal[3], qGoal[4], qGoal[5], v, a);
-    ur5->rt_interface_->addCommandToQueue(TargetString);  
-    RobotWait(ur5, rt_msg_cond_, qGoal);
+	}
+	ur5->rt_interface_->robot_state_->setDataPublished();
+	
+	double q[6];  
+	getq(ur5, rt_msg_cond_, q);
+	double qGoal[6];
+	getnearest(T06, q, qGoal);
+	qGoal[5] = qGoal[5]-((angle_offset+TCP_OFFSET)*M_PI/180);
+	char TargetString[200];
+	sprintf(TargetString, "movej([%.4f, %.4f, %.4f, %.4f, %.4f, %.4f], %.4f, %.4f)\n",
+		qGoal[0], qGoal[1], qGoal[2], qGoal[3], qGoal[4], qGoal[5], v, a);
+	ur5->rt_interface_->addCommandToQueue(TargetString);  
+	RobotWait(ur5, rt_msg_cond_, qGoal);
 }
 
 void moveSimpleJointDirect(UrDriver *ur5, std::condition_variable *rt_msg_cond_, double qGoal[6], double v, double a)
 {
-    std::mutex msg_lock;
-    std::unique_lock<std::mutex> locker(msg_lock);
-    while (!ur5->rt_interface_->robot_state_->getDataPublished())
-    {
+	std::mutex msg_lock;
+	std::unique_lock<std::mutex> locker(msg_lock);
+	while (!ur5->rt_interface_->robot_state_->getDataPublished())
+	{
 	rt_msg_cond_->wait(locker);
-    }
-    ur5->rt_interface_->robot_state_->setDataPublished();
-    
-    char TargetString[200];
-    sprintf(TargetString, "movej([%.4f, %.4f, %.4f, %.4f, %.4f, %.4f], %.4f, %.4f)\n",
-	    qGoal[0], qGoal[1], qGoal[2], qGoal[3], qGoal[4], qGoal[5], v, a);
-    ur5->rt_interface_->addCommandToQueue(TargetString);  
-    RobotWait(ur5, rt_msg_cond_, qGoal);
+	}
+	ur5->rt_interface_->robot_state_->setDataPublished();
+	
+	char TargetString[200];
+	sprintf(TargetString, "movej([%.4f, %.4f, %.4f, %.4f, %.4f, %.4f], %.4f, %.4f)\n",
+		qGoal[0], qGoal[1], qGoal[2], qGoal[3], qGoal[4], qGoal[5], v, a);
+	ur5->rt_interface_->addCommandToQueue(TargetString);  
+	RobotWait(ur5, rt_msg_cond_, qGoal);
 }
 
 void moveSimpleCart(UrDriver *ur5, std::condition_variable *rt_msg_cond_, double T06[16], int angle_offset, double v, double a)
 {
-    std::mutex msg_lock;
-    std::unique_lock<std::mutex> locker(msg_lock);
-    while (!ur5->rt_interface_->robot_state_->getDataPublished())
-    {
+	std::mutex msg_lock;
+	std::unique_lock<std::mutex> locker(msg_lock);
+	while (!ur5->rt_interface_->robot_state_->getDataPublished())
+	{
 	rt_msg_cond_->wait(locker);
-    }
-    ur5->rt_interface_->robot_state_->setDataPublished();
-    
-    double q[6];
-    getq(ur5, rt_msg_cond_, q);
-    double qGoal[6];
-    getnearest(T06, q, qGoal);
-    qGoal[5] = qGoal[5]-((angle_offset+TCP_OFFSET)*M_PI/180);
-    char TargetString[200];
-    sprintf(TargetString, "movel([%.4f, %.4f, %.4f, %.4f, %.4f, %.4f], %.4f, %.4f)\n",
-	    qGoal[0], qGoal[1], qGoal[2], qGoal[3], qGoal[4], qGoal[5], v, a);
-    ur5->rt_interface_->addCommandToQueue(TargetString); 
-    RobotWait(ur5, rt_msg_cond_, qGoal);
+	}
+	ur5->rt_interface_->robot_state_->setDataPublished();
+	
+	double q[6];
+	getq(ur5, rt_msg_cond_, q);
+	double qGoal[6];
+	getnearest(T06, q, qGoal);
+	qGoal[5] = qGoal[5]-((angle_offset+TCP_OFFSET)*M_PI/180);
+	char TargetString[200];
+	sprintf(TargetString, "movel([%.4f, %.4f, %.4f, %.4f, %.4f, %.4f], %.4f, %.4f)\n",
+		qGoal[0], qGoal[1], qGoal[2], qGoal[3], qGoal[4], qGoal[5], v, a);
+	ur5->rt_interface_->addCommandToQueue(TargetString); 
+	RobotWait(ur5, rt_msg_cond_, qGoal);
 }
 
 void moveSimpleCartDirect(UrDriver *ur5, std::condition_variable *rt_msg_cond_, double T06[16], double v, double a)
 {
-    std::mutex msg_lock;
-    std::unique_lock<std::mutex> locker(msg_lock);
-    while (!ur5->rt_interface_->robot_state_->getDataPublished())
-    {
+	std::mutex msg_lock;
+	std::unique_lock<std::mutex> locker(msg_lock);
+	while (!ur5->rt_interface_->robot_state_->getDataPublished())
+	{
 	rt_msg_cond_->wait(locker);
-    }
-    ur5->rt_interface_->robot_state_->setDataPublished();
-    
-    double q[6];
-    getq(ur5, rt_msg_cond_, q);
-    double qGoal[6];
-    getnearest(T06, q, qGoal);    
-    char TargetString[200];
-    sprintf(TargetString, "movel([%.4f, %.4f, %.4f, %.4f, %.4f, %.4f], %.4f, %.4f)\n",
-	    qGoal[0], qGoal[1], qGoal[2], qGoal[3], qGoal[4], qGoal[5], v, a);
-    ur5->rt_interface_->addCommandToQueue(TargetString); 
-    RobotWait(ur5, rt_msg_cond_, qGoal);
+	}
+	ur5->rt_interface_->robot_state_->setDataPublished();
+	
+	double q[6];
+	getq(ur5, rt_msg_cond_, q);
+	double qGoal[6];
+	getnearest(T06, q, qGoal);	
+	char TargetString[200];
+	sprintf(TargetString, "movel([%.4f, %.4f, %.4f, %.4f, %.4f, %.4f], %.4f, %.4f)\n",
+		qGoal[0], qGoal[1], qGoal[2], qGoal[3], qGoal[4], qGoal[5], v, a);
+	ur5->rt_interface_->addCommandToQueue(TargetString); 
+	RobotWait(ur5, rt_msg_cond_, qGoal);
 }
 /*
 void moveTaskSpace(double q[6], double X_CHANGE, double Y_CHANGE, double Z_CHANGE, double T06_NEW[16])
 {
-    double T06[16];
-    ur_kinematics::forward(q, T06);
-    double INV_T06[16];
-    gluInvertMatrix(T06, INV_T06);
-    INV_T06[3]  = INV_T06[3]  + X_CHANGE;
-    INV_T06[7]  = INV_T06[7]  + Y_CHANGE;
-    INV_T06[11] = INV_T06[11] + Z_CHANGE;
-    gluInvertMatrix(INV_T06, T06_NEW);
+	double T06[16];
+	ur_kinematics::forward(q, T06);
+	double INV_T06[16];
+	gluInvertMatrix(T06, INV_T06);
+	INV_T06[3]  = INV_T06[3]  + X_CHANGE;
+	INV_T06[7]  = INV_T06[7]  + Y_CHANGE;
+	INV_T06[11] = INV_T06[11] + Z_CHANGE;
+	gluInvertMatrix(INV_T06, T06_NEW);
 }
 */
 void rgbControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int status)
 {
-    char TargetString[200];
-    
-    if(status==1)
+	char TargetString[200];
+	
+	if(status==1)
 	sprintf(TargetString, "set_tool_voltage(12)\n");
-    
-    if(status==0)
+	
+	if(status==0)
 	sprintf(TargetString, "set_tool_voltage(0)\n");
-    
-    ur5->rt_interface_->addCommandToQueue(TargetString);
-    usleep(1000000);
+	
+	ur5->rt_interface_->addCommandToQueue(TargetString);
+	usleep(1000000);
 }
   
 
@@ -276,220 +278,54 @@ void rgbControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int status
 int main()
 {
   
-    // ROBOT CONNECTION
-    std::condition_variable rt_msg_cond_;
-    std::condition_variable msg_cond_;
-    UrDriver ur5(rt_msg_cond_, msg_cond_,"10.42.0.63",5000);
-    ur5.start();
-    std::cout << "Connecting to robot ..." << std::endl;
-    std::mutex msg_lock;
-    std::unique_lock<std::mutex> locker(msg_lock);
-    std::cout << "Waiting for data ..." << std::endl;
-    while (!ur5.rt_interface_->robot_state_->getDataPublished())
-    {
+	// ROBOT CONNECTION
+	std::condition_variable rt_msg_cond_;
+	std::condition_variable msg_cond_;
+	UrDriver ur5(rt_msg_cond_, msg_cond_,"10.42.0.63",5000);
+	ur5.start();
+	std::cout << "Connecting to robot ..." << std::endl;
+	std::mutex msg_lock;
+	std::unique_lock<std::mutex> locker(msg_lock);
+	std::cout << "Waiting for data ..." << std::endl;
+	while (!ur5.rt_interface_->robot_state_->getDataPublished())
+	{
 	rt_msg_cond_.wait(locker);
-    }
-    std::cout << "Data received!" << std::endl;
-    
-    
-    
-    // APPROX. START LOCATIONS
-    double qStart[6] = {0.0313, -2.6049, -1.1329, 0.5415, 1.4320, 0.6555}; 
-    //Approximate starting position
-    //double qTool[6] = {1.33906, -0.967229, 0.397516, 0.565406, -0.235619, 2.98923};
-    /*double q[6];
-    getq(&ur5, &rt_msg_cond_, q);    
-    char TargetString[200];
-    sprintf(TargetString, "movel([%.4f, %.4f, %.4f, %.4f, %.4f, %.4f], %.4f, %.4f)\n", q[0], q[1], q[2], q[3], q[4], q[5], 0.2, 0.2);
-    std::cout << "Current pose is: " << TargetString << std::endl;
-    */
-    // MOVE TO STARING POINT
-    moveSimpleJointDirect(&ur5, &rt_msg_cond_, qStart, 0.2, 0.2);
-    //qStart[1] = qStart[1]+0.01;
-    //double T06_TOOL_75[6] = {0.0413, -2.6049, -1.1329, 0.5415, 1.4320, 0.6055};
-    //std::cout << "Moving a bit... " << std::endl;
-    //moveSimpleJoint(&ur5, &rt_msg_cond_, qStart, 0, 0.2, 0.2);
-    //moveSimpleJointDirect(&ur5, &rt_msg_cond_, T06_TOOL_75, 0.5, 0.5);
-
-    /*
-    std::vector<cv::Vec3f> circles;
-    cv::Point2f hexPoint;
-    int successDetect = 0;
-    double BoltWorld[3];    
-    for(int i = 0; i < 3; i++)
-    {
-	//BoltDetection(&circles, &hexPoint);	
-	moveValve(&ur5, &rt_msg_cond_, &circles, &hexPoint, BoltWorld, &successDetect);
-    }
-    
-    
-    
-    if(successDetect == 1)
-    {	
-	
-        // ALIGN VALVE
-        double rot[9];
-	trans3D(GAMMA, BETA, ALPHA, rot); 
-	
-	double T06_VALVE_GOAL_ALIGN[16];
-	getTransformation(rot, BoltWorld[0]-0.2, BoltWorld[1]+GRIPPEROFFSET_Y, BoltWorld[2]-GRIPPEROFFSET_Z, T06_VALVE_GOAL_ALIGN);
-	moveSimpleJoint(&ur5, &rt_msg_cond_, T06_VALVE_GOAL_ALIGN, 0, 0.2, 0.2);
+	}	
+	std::cout << "Data received!" << std::endl;
 	
 	
 	
-	// APPROACH VALVE
-	double T06_VALVE_GOAL[16];
-	getTransformation(rot, BoltWorld[0]-GRIPPEROFFSET_X-CIRCLE_OFFSET, BoltWorld[1]+GRIPPEROFFSET_Y, BoltWorld[2]-GRIPPEROFFSET_Z, T06_VALVE_GOAL);
-	moveSimpleCart(&ur5, &rt_msg_cond_, T06_VALVE_GOAL, 0, 0.05, 0.05);
+	// Approximate starting position
+	double qStart[6] = {0.1585, -2.5167, -1.3030, 0.6209, 1.3051, -1.4865};//{0.0313, -2.6049, -1.1329, 0.5415, 1.4320, 0.6555}; 
 	
-	
-	upBack(&ur5, &rt_msg_cond_, 0, 0, 0.075);
-	
-	
-
-        
-	// START LOOKING FOR TOOL	
-	moveSimpleJointDirect(&ur5, &rt_msg_cond_, qTool, 0.5, 0.5);
-	
-	
-	
-	//rgbControl(&ur5, &rt_msg_cond_, 1);
-	
-	
-	
-	
-	*/
+	// Reading current position
 	/*
-	cv::Point2d TOOL_IMAGE_CENTER_1;
-	int TOOL_CENTER_DIST_1;
-	ToolDetection(DESIRED_TOOL, &TOOL_IMAGE_CENTER_1, &TOOL_CENTER_DIST_1);
-	double ZcTool_1;
-	calcDistance(TOOL_CENTER_DIST_1, 0.05, &ZcTool_1);
-	int uTool_1 = TOOL_IMAGE_CENTER_1.x;
-	int vTool_1 = TOOL_IMAGE_CENTER_1.y;
-	if((uTool_1 == 0 && vTool_1 == 0) || isinf(ZcTool_1) == 1)
-	{
-	    std::cout << "Improper picture ... Exiting program!" << std::endl;
-	}
-	else
-	{
-	    double T06_Tool_1[16];
-	    ur_kinematics::forward(qTool, T06_Tool_1);    
-	    double ToolWorld_1[3];
-	    image2base(T06_Tool_1, ZcTool_1, uTool_1, vTool_1, ToolWorld_1);
-	    std::cout << "Tool position in robot base frame: " << ToolWorld_1[0] << " " << ToolWorld_1[1] << " " << ToolWorld_1[2] << std::endl;
-	    std::cout << "Distance to tool from camera: " << ZcTool_1 << std::endl;
-	    
-	    // FIRST TOOL APPROACH
-	    double TGoalTool_1[16];              
-	    getTransformation(rot, ToolWorld_1[0]-0.25, ToolWorld_1[1]-0.02, ToolWorld_1[2]+0.025, TGoalTool_1);
-	    moveSimpleJoint(&ur5, &rt_msg_cond_, TGoalTool_1, 0, 0.5, 0.5);
-	    //GripperControl(&ur5, &rt_msg_cond_, 0);
-	    usleep(2000000);
-	    
-	    // SECOND TOOL DETECTION
-	    cv::Point2d TOOL_IMAGE_CENTER_2;
-	    int TOOL_CENTER_DIST_2;
-	    ToolDetection(DESIRED_TOOL, &TOOL_IMAGE_CENTER_2, &TOOL_CENTER_DIST_2);
-	    int uTool_2 = TOOL_IMAGE_CENTER_2.x;
-	    int vTool_2 = TOOL_IMAGE_CENTER_2.y;
-	    double q[6];
-	    getq(&ur5, &rt_msg_cond_, q);
-	    double T06_Tool_2[16];  
-	    ur_kinematics::forward(q, T06_Tool_2);
-	    double ZcTool_2;
-	    calcDistance(TOOL_CENTER_DIST_2, 0.05, &ZcTool_2);
-	    double ToolWorld_2[3];
-	    image2base(T06_Tool_2, ZcTool_2, uTool_2, vTool_2, ToolWorld_2);
-	    std::cout << "Tool position in robot base frame: " << ToolWorld_2[0] << " " << ToolWorld_2[1] << " " << ToolWorld_2[2] << std::endl;
-	    std::cout << "Distance to tool from camera: " << ZcTool_2 << std::endl;
-	    
-	    
-	    
-	    rgbControl(&ur5, &rt_msg_cond_, 0);
-	    */
-	    /*
-	    // APPROACH TOOL
-	    GripperControl(&ur5, &rt_msg_cond_, 150);
-	    usleep(2000000);
-	    double TGoalTool_2[16];              
-	    getTransformation(rot, ToolWorld_2[0]-GRIPPEROFFSET_X, ToolWorld_2[1]+GRIPPEROFFSET_Y, ToolWorld_2[2]-GRIPPEROFFSET_Z, TGoalTool_2);
-	    double wayPoint[16];
-	    memcpy(&wayPoint, &TGoalTool_2, sizeof(TGoalTool_2));
-	    wayPoint[3] = wayPoint[3]-0.025;
-	    moveSimpleJoint(&ur5, &rt_msg_cond_, wayPoint, 0, 0.5, 0.5);
-	    double rot75[9];
-	    double vertical_angle = 7.5*M_PI/180;
-	    trans3D(GAMMA+vertical_angle, BETA, ALPHA, rot75); 
-	    double T06_TOOL_75[16];
-	    getTransformation(rot75, TGoalTool_2[3]+0.01, TGoalTool_2[7], TGoalTool_2[11]-0.03, T06_TOOL_75);
-	    moveSimpleCart(&ur5, &rt_msg_cond_, T06_TOOL_75, 0, 0.05, 0.05);
-	    
-	    */
+	double q[6];
+	getq(&ur5, &rt_msg_cond_, q);	
+	char TargetString[200];
+	sprintf(TargetString, "movel([%.4f, %.4f, %.4f, %.4f, %.4f, %.4f], %.4f, %.4f)\n", q[0], q[1], q[2], q[3], q[4], q[5], 0.2, 0.2);
+	std::cout << "Current pose is: " << TargetString << std::endl;
+	*/
 	
-	   
-	    /*
-	    // PICK UP TOOL
-	    GripperControl(&ur5, &rt_msg_cond_, 255);
-	    usleep(2000000);
-	    */
-	   
-	    
-	   
-	    
-	    //upBack(&ur5, &rt_msg_cond_, 1, 0.002, 0.075);
-	    
-	    
-	    
-	    
-	    /*
-	    // BACK TO VALVE
-	    double wrench_length = wrench10-GRIPPEROFFSET_Z;
-	    double nut_radius = 0.010/2;
-	   
-	    double T06_VALVE_GOAL_BACK[16];
-	    memcpy(&T06_VALVE_GOAL_BACK, &T06_VALVE_GOAL, sizeof(T06_VALVE_GOAL));
-	    T06_VALVE_GOAL_BACK[3]  = T06_VALVE_GOAL[3]; 
-	    T06_VALVE_GOAL_BACK[7]  = T06_VALVE_GOAL[7]+sin(15*M_PI/180)*nut_radius+sin(15*M_PI/180)*wrench_length+0.005;
-	    T06_VALVE_GOAL_BACK[11] = T06_VALVE_GOAL[11]+cos(15*M_PI/180)*nut_radius+cos(15*M_PI/180)*wrench_length+0.03;
-	    moveSimpleJoint(&ur5, &rt_msg_cond_, T06_VALVE_GOAL_BACK, 15, 0.5, 0.5);
-	    
-	    
-	 
-	    
-	    */
-	    // FORCE CONTROL
-	    std::cout << "Initializing force control. \n";
-	    pthread_t forceID;
-	    startFT(&forceID);
-	    
-	    simpleForceControl(&ur5, &rt_msg_cond_, 200, 1, 0.5);//forceControl(&ur5, &rt_msg_cond_, 5, 2, 5.0);
-	    //forceControl(&ur5, &rt_msg_cond_, 20, 1, 5.0);
-	    usleep(10000);
-	    stopFT(&forceID);
-	    std::cout << "Shutting down force control. \n";
-	    
-	    
-	    
-	    /*
+	// MOVE TO STARING POINT
+	std::cout << "Moving to staring location. " << std::endl;
+	moveSimpleJointDirect(&ur5, &rt_msg_cond_, qStart, 1, 1);
+	//moveSimpleJoint(&ur5, &rt_msg_cond_, qStart, 0, 0.2, 0.2);
 
-	    // PLACE TOOL
-	    double q_BACK[6];
-	    getq(&ur5, &rt_msg_cond_, q_BACK);
-	    double T[16];
-	    moveTaskSpace(q_BACK, 0, 0.05, 0, T);
-	    moveSimpleCartDirect(&ur5, &rt_msg_cond_, T, 0.05, 0.05);		
-	    upBack(&ur5, &rt_msg_cond_, 0, 0, 0.075);
-	    wayPoint[3] = wayPoint[3]-0.020;
-	    moveSimpleJoint(&ur5, &rt_msg_cond_, wayPoint, 0, 0.5, 0.5);
-	    moveSimpleCart(&ur5, &rt_msg_cond_, T06_TOOL_75, 0, 0.05, 0.05);
-	    GripperControl(&ur5, &rt_msg_cond_, 150);
-	    usleep(2000000);
-	    wayPoint[3] = wayPoint[3]-0.060;
-	    moveSimpleJoint(&ur5, &rt_msg_cond_, wayPoint, 0, 0.2, 0.2);
-	    
-        }*/
-    ur5.halt();
-    std::cout << "Disconnected!\n";
-    return 0;
+	// FORCE CONTROL
+	int mode = 1; // TriggerAssisted, Challange based, etc.
+	//std::cout << "Initializing force control. \n";
+	pthread_t forceID;
+	//startFT(&forceID);
+	//std::cout << "Please enter the desired mode. \n Enter 1 for Compliance mode: " << std::endl;
+	//std::cin >> mode; 
+	simpleForceControl(&ur5, &rt_msg_cond_, 200, mode, 3);//forceControl(&ur5, &rt_msg_cond_, 5, 2, 5.0);
+	//forceControl(&ur5, &rt_msg_cond_, 20, 1, 5.0);
+	usleep(10000);
+	
+	stopFT(&forceID);
+	std::cout << "Shutting down force control. \n";
+	ur5.halt();
+	std::cout << "Disconnected!\n";
+	return 0;
 }
