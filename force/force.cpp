@@ -206,9 +206,10 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 	//Control system for translation forces
 	double integrator_Fx = 0, integrator_Fy = 0, integrator_Fz = 0;
 	double derivator_Fx = 0, derivator_Fy = 0, derivator_Fz = 0;
-	double Kp = -0.005; //Doublecheck PI controller tuning
-	double Ki = -0.000025;
-	double Kd = -0.000025;
+	//Doublecheck PI controller tuning
+	double Kp = -0.008; //Original: -0.005 // Tuned: -0.008
+	double Ki = -0.0003; //Original: -0.000025 //Tuned: -0.00085 or -0.0001
+	double Kd = -0.000045; //Original: -0.000025 //Tuned: -0.00045
 	
 	double error_Fx = 0, error_Fy = 0, error_Fz = 0;
 	double prior_error_Fx = 0, prior_error_Fy = 0, prior_error_Fz = 0;
@@ -314,19 +315,8 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
    		
    		//Only update error if one of the forces exeedes a given threshhold (badly implemented low-pass filer)
    		//Vibrations in the manipulator transends to the end effector and gets interpeted as new inputs without this lowpass filter
-   		if(fabs(Forces[0]) > 1 || fabs(Forces[1]) > 1 || fabs(Forces[2]) > 1)
+   		if(fabs(Forces[0]) < 1 && fabs(Forces[1]) < 1 && fabs(Forces[2]) < 1)
    		{
-			error_Fx = Forces[0];
-			error_Fy = Forces[1];
-			error_Fz = Forces[2];
-			
-			error_Tx = Torques[0];
-			error_Ty = Torques[1];
-	   		error_Tz = Torques[2];
-			
-		}
-		else
-		{
 			error_Fx = 0;
 			error_Fy = 0;
 			error_Fz = 0;
@@ -342,6 +332,16 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 			integrator_Tx = 0;
 			integrator_Ty = 0;
 			integrator_Tz = 0;
+		}
+		else
+		{
+			error_Fx = Forces[0];
+			error_Fy = Forces[1];
+			error_Fz = Forces[2];
+			
+			error_Tx = Torques[0];
+			error_Ty = Torques[1];
+	   		error_Tz = Torques[2];
 		}
 
 		
@@ -378,7 +378,7 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 		if(rotation_on == 1) // Compliance mode
 		{
 			vw[0] = u_Fy; //The mounting of the F/T sensor require some adjustments to the TCP <-> FT frames
-			vw[1] = -u_Fx, 
+			vw[1] = -u_Fx; 
 			vw[2] = -u_Fz; 
 			vw[3] = 0;//u_Tx;
 			vw[4] = 0;//u_Ty;
@@ -386,7 +386,7 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 		}
 		if(rotation_on == 2)
 		{
-			vw[0] = u_Fx;
+			vw[0] = u_Fy;
 			vw[1] = u_Fy; 
 			vw[2] = 0; 
 			vw[3] = 0;
