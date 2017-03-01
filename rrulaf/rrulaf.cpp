@@ -296,9 +296,9 @@ int main()
 	
 	
 	// Approximate starting position
-	double qStart[6] = {0.1585, -2.5167, -1.3030, 0.6209, 1.3051, -1.4865};//{0.0313, -2.6049, -1.1329, 0.5415, 1.4320, 0.6555}; 
+	double qStart[6] = {0.1585, -2.5167, -1.3030, 0.6209, 1.3051, -1.4865};
 	
-	// Reading current position
+	// Reading and print current position
 	/*
 	double q[6];
 	getq(&ur5, &rt_msg_cond_, q);	
@@ -313,14 +313,14 @@ int main()
 	//moveSimpleJoint(&ur5, &rt_msg_cond_, qStart, 0, 0.2, 0.2);
 
 	// FORCE CONTROL
-	int mode = 1; // TriggerAssisted, Challange based, etc.
-	//std::cout << "Initializing force control. \n";
-	pthread_t forceID;
+	int force_mode = 1; // TriggerAssisted, Challange based, etc.
+	std::cout << "Initializing force control. \n" << std::endl;
+	pthread_t forceID; //this is done inside force.cpp
 	//startFT(&forceID);
 	//std::cout << "Please enter the desired mode. \n Enter 1 for Compliance mode: " << std::endl;
-	//std::cin >> mode; 
-	simpleForceControl(&ur5, &rt_msg_cond_, 200, mode, 3);//forceControl(&ur5, &rt_msg_cond_, 5, 2, 5.0);
-	//forceControl(&ur5, &rt_msg_cond_, 20, 1, 5.0);
+	//std::cin >> force_mode; 
+	simpleForceControl(&ur5, &rt_msg_cond_, 200, force_mode, 3);//forceControl(&ur5, &rt_msg_cond_, 5, 2, 5.0);
+	//simpleForceControl(&ur5, &rt_msg_cond_, 20, 2, 3);
 	usleep(10000);
 	
 	stopFT(&forceID);

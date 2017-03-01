@@ -4,7 +4,8 @@
 #include "ufwdkin_c.c"
 
 int initFT = 1;
-int forceSleepTime = 800; //usleep830 ~ 1200 Hz --> run a bit faster than FT broadcast frequency -- currently 1000 Hz
+int forceSleepTime = 10000; //usleep(10000) ~ 90 Hz --> run a bit faster than the fastest human reaction time -- currently involuntary muscle contractions at 24ms ~ 41,6 Hz
+//Fastest possible hardware update rate for the UR5 is set at 8ms ~ 125 Hz equivalent to usleep(8000)
 double rawFTdata[6];
 
 
@@ -191,43 +192,38 @@ void adjustForce(double sq6, double cq6, double outF[3]) //Adjusting for weight 
 	outF[1] = 1+magY*sin(sq6/4+cq6+1)+magY;
 }
 
-void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_time, int rotation_on, double f_ref)
+void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_time, int force_mode, double f_ref)
 {
-
-
-
-
 	pthread_t forceID;
-	startFT(&forceID);
-  
+	startFT(&forceID);	
+	
+	
 	std::cout << "Force control initiated - starting compliance mode ...\n";
 	std::ofstream forcelog;
 	forcelog.open("../data/logs/forcelog", std::ofstream::out);
 	//Control system for translation forces
 	double integrator_Fx = 0, integrator_Fy = 0, integrator_Fz = 0;
 	double derivator_Fx = 0, derivator_Fy = 0, derivator_Fz = 0;
-	//Doublecheck PI controller tuning
-	double Kp = -0.008; //Original: -0.005 // Tuned: -0.008
-	double Ki = -0.0003; //Original: -0.000025 //Tuned: -0.00085 or -0.0001
-	double Kd = -0.000045; //Original: -0.000025 //Tuned: -0.00045
+	double Kp = 0, Ki = 0, Kd = 0;
 	
 	double error_Fx = 0, error_Fy = 0, error_Fz = 0;
 	double prior_error_Fx = 0, prior_error_Fy = 0, prior_error_Fz = 0;
 	
-	double u_Fx = 0; double u_Fy = 0; double u_Fz = 0;
+	double u_Fx = 0, u_Fy = 0, u_Fz = 0;
 	
 	//Control system for rotational forces
-	//TODo: Add Kd and Kd_T to make a PID controller. Compare results with PI. 
 	//ToDo: Add threshold force referance. Remove F/T Bias at the F/T Net Box interface.
 	double integrator_Tx = 0, integrator_Ty = 0, integrator_Tz = 0;
-	//Doublecheck PI controller tuning 
-	double Kp_T = -0.005; //Original: -0.005;
-	double Ki_T = -0.000025; //Original: -0.000025;
+	double derivator_Tx = 0, derivator_Ty = 0, derivator_Tz = 0;
+	double Kp_T = 0, Ki_T = 0, Kd_T = 0;
 	
 	double error_Tx = 0, error_Ty = 0, error_Tz = 0;
+	double prior_error_Tx = 0, prior_error_Ty = 0, prior_error_Tz = 0;
 	
 	double u_Tx = 0, u_Ty = 0, u_Tz = 0;
 	
+	
+	//=======================================================================
 	double speed[6] = {0,0,0,0,0,0};
 	
 	
@@ -259,7 +255,7 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 
 	
 	double startTime = ur5->rt_interface_->robot_state_->getTime();
-	std::vector<double> sq = ur5->rt_interface_->robot_state_->getQActual(); //Start Q
+	std::vector<double> sq = ur5->rt_interface_->robot_state_->getQActual(); //sq = Start Q
 	
 	int i = 0; 
 	int iter = run_time/0.008;
@@ -269,6 +265,38 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 	{
 		angular_speed = -0.35;
 		std::cout << "Run-time too low -- setting angular speed to -0.35 rad/s" << std::endl;
+	}
+	
+	//Doublecheck PID controller tuning
+	if(force_mode == 1) // Compliance mode
+	{
+		Kp = -0.008; //Original: -0.005 // Tuned: -0.008
+		Ki = -0.0003; //Original: -0.000025 //Tuned: -0.00085 or -0.0003
+		Kd = -0.000045; //Original: -0.000025 //Tuned: -0.00045
+		Kp_T = -0.008; //Original: -0.005;
+		Ki_T = -0.0003; //Original: -0.000025;
+		Kd_T = -0.000045;
+	}
+	
+	if(force_mode == 2) // Buoyancy mode
+	{
+		Kp = -0.008; //Original: -0.005 // Tuned: -0.008
+		Ki = -0.0003; //Original: -0.000025 //Tuned: -0.00085 or -0.0003
+		Kd = -0.000045; //Original: -0.000025 //Tuned: -0.00045
+	}
+	
+	if(force_mode == 3) // Compliance mode
+	{
+		Kp = -0.008; //Original: -0.005 // Tuned: -0.008
+		Ki = -0.0003; //Original: -0.000025 //Tuned: -0.00085 or -0.0003
+		Kd = -0.000045; //Original: -0.000025 //Tuned: -0.00045
+	}
+	
+	if(force_mode == 4) // Compliance mode
+	{
+		Kp = -0.008; //Original: -0.005 // Tuned: -0.008
+		Ki = -0.0003; //Original: -0.000025 //Tuned: -0.00085 or -0.0003
+		Kd = -0.000045; //Original: -0.000025 //Tuned: -0.00045
 	}
 	
 	while(i<iter)
@@ -317,21 +345,21 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
    		//Vibrations in the manipulator transends to the end effector and gets interpeted as new inputs without this lowpass filter
    		if(fabs(Forces[0]) < 1 && fabs(Forces[1]) < 1 && fabs(Forces[2]) < 1)
    		{
-			error_Fx = 0;
-			error_Fy = 0;
-			error_Fz = 0;
+			error_Fx = error_Fx/1.2; //Using [variable/1.2] to ensure a "soft" stopping behaviour
+			error_Fy = error_Fy/1.2;
+			error_Fz = error_Fz/1.2;
 			
-			error_Tx = 0;
-			error_Ty = 0;
-	   		error_Tz = 0;
+			error_Tx = error_Tx/1.2;
+			error_Ty = error_Ty/1.2;
+	   		error_Tz = error_Tz/1.2;
 	   		
-			integrator_Fx = 0;
-			integrator_Fy = 0;
-			integrator_Fz = 0;
+			integrator_Fx = integrator_Fx/1.2;
+			integrator_Fy = integrator_Fy/1.2;
+			integrator_Fz = integrator_Fz/1.2;
 			
-			integrator_Tx = 0;
-			integrator_Ty = 0;
-			integrator_Tz = 0;
+			integrator_Tx = integrator_Tx/1.2;
+			integrator_Ty = integrator_Ty/1.2;
+			integrator_Tz = integrator_Tz/1.2;
 		}
 		else
 		{
@@ -352,7 +380,8 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 			break;
 		}
 		
-		//Controller
+		//===============Controller=====================
+		//Translational forces
 		integrator_Fx = integrator_Fx + error_Fx;
 		integrator_Fy = integrator_Fy + error_Fy;
 		integrator_Fz = integrator_Fz + error_Fz;
@@ -361,21 +390,44 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 		derivator_Fy = error_Fy - prior_error_Fy;
 		derivator_Fz = error_Fz - prior_error_Fz;
 		
-		integrator_Tx = integrator_Tx + error_Tx;
-		integrator_Ty = integrator_Ty + error_Ty;
-		integrator_Tz = integrator_Tz + error_Tz;
-		
-		
 		u_Fx = Kp*error_Fx + Ki*integrator_Fx + Kd*derivator_Fx;
 		u_Fy = Kp*error_Fy + Ki*integrator_Fy + Kd*derivator_Fy;
 		u_Fz = Kp*error_Fz + Ki*integrator_Fz + Kd*derivator_Fz;
 		
-		u_Tx = Kp_T*error_Tx + Ki_T*integrator_Tx;
-		u_Ty = Kp_T*error_Ty + Ki_T*integrator_Ty;
-		u_Tz = Kp_T*error_Tz + Ki_T*integrator_Tz;
+		//Rotational forces - torques
+		integrator_Tx = integrator_Tx + error_Tx;
+		integrator_Ty = integrator_Ty + error_Ty;
+		integrator_Tz = integrator_Tz + error_Tz;
+		
+		derivator_Tx = error_Tx - prior_error_Tx;
+		derivator_Ty = error_Ty - prior_error_Ty;
+		derivator_Tz = error_Tz - prior_error_Tz;
+		
+		u_Tx = Kp_T*error_Tx + Ki_T*integrator_Tx + Kd_T*derivator_Tx;
+		u_Ty = Kp_T*error_Ty + Ki_T*integrator_Ty + Kd_T*derivator_Ty;
+		u_Tz = Kp_T*error_Tz + Ki_T*integrator_Tz + Kd_T*derivator_Tz;
 		
 		//Set different modes to exert a different rehabilitation strategy
-		if(rotation_on == 1) // Compliance mode
+		if(force_mode == 1) // Compliance mode
+		{
+			vw[0] = u_Fy; //The mounting of the F/T sensor require some adjustments to the TCP <-> FT frames
+			vw[1] = -u_Fx; 
+			vw[2] = -u_Fz; 
+			vw[3] = 0;//u_Ty;//u_Tx;
+			vw[4] = 0;//-u_Tx;//u_Ty;
+			vw[5] = 0;//-u_Tz;//u_Tz;
+		}
+		if(force_mode == 2) //Buoyancy mode
+		{
+			vw[0] = u_Fy; //The mounting of the F/T sensor require some adjustments to the TCP <-> FT frames
+			vw[1] = -u_Fx; 
+			vw[2] = -u_Fz; 
+			vw[3] = 0;//u_Tx;
+			vw[4] = 0;//u_Ty;
+			vw[5] = 0;//u_Tz;
+			biasFT[1] = 20; // This generates a constant force of 20N on the Y-axis. The arm is "floating".
+		}
+		if(force_mode == 3)
 		{
 			vw[0] = u_Fy; //The mounting of the F/T sensor require some adjustments to the TCP <-> FT frames
 			vw[1] = -u_Fx; 
@@ -384,25 +436,7 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 			vw[4] = 0;//u_Ty;
 			vw[5] = 0;//u_Tz;
 		}
-		if(rotation_on == 2)
-		{
-			vw[0] = u_Fy;
-			vw[1] = u_Fy; 
-			vw[2] = 0; 
-			vw[3] = 0;
-			vw[4] = 0;
-			vw[5] = 0;
-		}
-		if(rotation_on == 3)
-		{
-			vw[0] = 0;
-			vw[1] = 0; 
-			vw[2] = 0; 
-			vw[3] = 0;
-			vw[4] = 0;
-			vw[5] = 0;
-		}
-		if(rotation_on == 4)
+		if(force_mode == 4)
 		{
 			vw[0] = 0;
 			vw[1] = 0; 
@@ -417,17 +451,21 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 		
 		
 		ur5->rt_interface_->robot_state_->setDataPublished();
-		ur5->setSpeed(speed[0], speed[1], speed[2], speed[3], speed[4], speed[5], 15);
+		ur5->setSpeed(speed[0], speed[1], speed[2], speed[3], speed[4], speed[5], 20);
 		
 		
 		prior_error_Fx = error_Fx; 
 		prior_error_Fy = error_Fy;
 		prior_error_Fz = error_Fz;
+		
+		prior_error_Tx = error_Tx; 
+		prior_error_Ty = error_Ty;
+		prior_error_Tz = error_Tz;
 		//std::cout << elapsTime << "\t" << i << std::endl;
 		//std::cout << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << "\n";
 	
 	
-		forcelog << elapsTime << " " << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " " << q[4] << " " << q[5] << " " << u_Fx << " " << u_Fy << " " << u_Fz << " " << current_TCP_Frame[0] << " " << current_TCP_Frame[1] << " " << current_TCP_Frame[2] << " " << ref_TCP_Frame[0] << " " << ref_TCP_Frame[1] << " " << ref_TCP_Frame[2] << " " << current_TCP_Frame_adjusted[0] << " " << current_TCP_Frame_adjusted[1] << " " << new_TCP_Frame[0] << " " << new_TCP_Frame[1] << " " << Torques[0] << " " << Torques[1] << " " << Torques[2] << "\n";
+		forcelog << elapsTime << " " << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " " << q[4] << " " << q[5] << " " << u_Fx << " " << u_Fy << " " << u_Fz << " " << current_TCP_Frame[0] << " " << current_TCP_Frame[1] << " " << current_TCP_Frame[2] << " " << ref_TCP_Frame[0] << " " << ref_TCP_Frame[1] << " " << ref_TCP_Frame[2] << " " << current_TCP_Frame_adjusted[0] << " " << current_TCP_Frame_adjusted[1] << " " << new_TCP_Frame[0] << " " << new_TCP_Frame[1] << " " << Torques[0] << " " << Torques[1] << " " << Torques[2] << " " << "\n";
 		
 		
 		i=i+1;

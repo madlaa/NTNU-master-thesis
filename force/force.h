@@ -55,7 +55,7 @@ void *getFTData(void *arg);
 void startFT(pthread_t *forceID);
 void stopFT(pthread_t *forceID);
 void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_time, int rotation_on, double f_ref);
-void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_time, int rotation_on, double f_ref);
+void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_time, int force_mode, double f_ref);
 void forceTransformation(UrDriver *ur5, std::condition_variable *rt_msg_cond_, double ft_in[3], double ft_out[3]);
 void adjustForce(double sq6, double cq6, double outF[3]);
 void rotate(gsl_vector *res,gsl_matrix *R, gsl_vector *inp,gsl_vector *t1,gsl_vector *t2);
