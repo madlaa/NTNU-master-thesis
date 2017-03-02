@@ -43,4 +43,5 @@ void moveSimpleJointDirect(UrDriver *ur5, std::condition_variable *rt_msg_cond_,
 void moveSimpleCart(UrDriver *ur5, std::condition_variable *rt_msg_cond_, double T06[16], int angle_offset, double v, double a);
 void moveSimpleCartDirect(UrDriver *ur5, std::condition_variable *rt_msg_cond_, double T06[16], double v, double a);
 void moveTaskSpace(double q[6], double X_CHANGE, double Y_CHANGE, double Z_CHANGE, double T06_NEW[16]);
+void gluInvertMatrix(const double m[16], double invOut[16]);
 void rgbControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int status);

@@ -100,12 +100,12 @@ void stopFT(pthread_t *forceID)
 
 void forceTransformation(double ft_in[3], double ft_out[3])
 {
-	ft_in = ft_out;
+	ft_in = ft_out; //Using a stick that is uniformly shaped.
 	/*
-	double theta = 2.2328;
-	double rot[9];
-	rot_z(theta, rot); //Replace? Wants rotation around Z-axis
-
+	double theta = -1,57079633;//2.2328;
+	double rot[9] = {cos(theta),-sin(theta),0,sin(theta),cos(theta),0,0,0,1};
+	//rot_z(theta, rot); //Located in vision.cpp. Wants rotation around Z-axis
+	
 	double ft_wrist[4];
 	ft_wrist[0] = rot[0]*ft_in[0] + rot[1]*ft_in[1] + rot[2]*ft_in[2]; 
 	ft_wrist[1] = rot[3]*ft_in[0] + rot[4]*ft_in[1] + rot[5]*ft_in[2];
@@ -182,8 +182,8 @@ void solveInverseJacobian(std::vector<double> q, double vw[6], double qd[6])
 	}
 }
 
-
-void adjustForce(double sq6, double cq6, double outF[3]) //Adjusting for weight of equptment?
+//called by adjustForce(sq[5], q[5], current_TCP_Frame_adjusted);
+void adjustForce(double sq6, double cq6, double outF[3]) //Adjusting for weight of equptment? Initializing circular motion
 {
 	double magX = -11.4048;
 	double magY = -11.4560;
@@ -232,7 +232,6 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 	
 	double vw[6];
  
-	
  
 	double biasFT[3] = {rawFTdata[0], rawFTdata[1], rawFTdata[2]};
 	double biasTorque[3] = {rawFTdata[3], rawFTdata[4], rawFTdata[5]};
@@ -241,7 +240,7 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 	double ref_FT_Frame[3] = {rawFTdata[0]-biasFT[0], rawFTdata[1]-biasFT[1], rawFTdata[2]-biasFT[2]};
 	
 	
-	double Fangle = -1.209406804939513;
+	double Fangle = -1.209406804939513; //-1.57079633;
 	double f_refx = f_ref*cos(Fangle);
 	double f_refy = f_ref*sin(Fangle);
 	
@@ -249,7 +248,7 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 	
 	
 	forceTransformation(ref_FT_Frame, ref_TCP_Frame);
-	ref_TCP_Frame[0] = ref_TCP_Frame[0]+f_refx;
+	ref_TCP_Frame[0] = ref_TCP_Frame[0]+f_refx; //f_refx can be used for setting a bouyancy?
 	ref_TCP_Frame[1] = ref_TCP_Frame[1]+f_refy;
 	
 
@@ -273,8 +272,8 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 		Kp = -0.008; //Original: -0.005 // Tuned: -0.008
 		Ki = -0.0003; //Original: -0.000025 //Tuned: -0.00085 or -0.0003
 		Kd = -0.000045; //Original: -0.000025 //Tuned: -0.00045
-		Kp_T = -0.008; //Original: -0.005;
-		Ki_T = -0.0003; //Original: -0.000025;
+		Kp_T = -0.3; //Original: -0.005;
+		Ki_T = -0.003; //Original: -0.000025;
 		Kd_T = -0.000045;
 	}
 	
@@ -311,7 +310,8 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 
 		
 
-		double Torques[3] = {rawFTdata[3]-biasTorque[3], rawFTdata[4]-biasTorque[4], rawFTdata[5]-biasTorque[5]};
+		//double Torques[3] = {rawFTdata[3]-biasTorque[3], rawFTdata[4]-biasTorque[4], rawFTdata[5]-biasTorque[5]};
+		double Torques[3] = {rawFTdata[3], rawFTdata[4], rawFTdata[5]};
 		double Forces[3] = {rawFTdata[0]-biasFT[0], rawFTdata[1]-biasFT[1], rawFTdata[2]-biasFT[2]};
 		
 		double timeStamp = ur5->rt_interface_->robot_state_->getTime();
@@ -349,24 +349,30 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 			error_Fy = error_Fy/1.2;
 			error_Fz = error_Fz/1.2;
 			
-			error_Tx = error_Tx/1.2;
-			error_Ty = error_Ty/1.2;
-	   		error_Tz = error_Tz/1.2;
-	   		
 			integrator_Fx = integrator_Fx/1.2;
 			integrator_Fy = integrator_Fy/1.2;
 			integrator_Fz = integrator_Fz/1.2;
 			
-			integrator_Tx = integrator_Tx/1.2;
-			integrator_Ty = integrator_Ty/1.2;
-			integrator_Tz = integrator_Tz/1.2;
+			
 		}
 		else
 		{
 			error_Fx = Forces[0];
 			error_Fy = Forces[1];
 			error_Fz = Forces[2];
-			
+		}
+		if(fabs(Torques[0]) < 1 && fabs(Torques[1]) < 1 && fabs(Torques[2]) < 0.4)
+		{
+			error_Tx = error_Tx/1.2;
+			error_Ty = error_Ty/1.2;
+	   		error_Tz = error_Tz/1.2;
+	   		
+	   		integrator_Tx = integrator_Tx/1.2;
+			integrator_Ty = integrator_Ty/1.2;
+			integrator_Tz = integrator_Tz/1.2;
+		}
+		else
+		{
 			error_Tx = Torques[0];
 			error_Ty = Torques[1];
 	   		error_Tz = Torques[2];
@@ -413,9 +419,9 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 			vw[0] = u_Fy; //The mounting of the F/T sensor require some adjustments to the TCP <-> FT frames
 			vw[1] = -u_Fx; 
 			vw[2] = -u_Fz; 
-			vw[3] = 0;//u_Ty;//u_Tx;
-			vw[4] = 0;//-u_Tx;//u_Ty;
-			vw[5] = 0;//-u_Tz;//u_Tz;
+			vw[3] = 0;//u_Ty;
+			vw[4] = 0;//-u_Tx;
+			vw[5] = 0;//-u_Tz;
 		}
 		if(force_mode == 2) //Buoyancy mode
 		{
