@@ -471,7 +471,7 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 		//std::cout << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << "\n";
 	
 	
-		forcelog << elapsTime << " " << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " " << q[4] << " " << q[5] << " " << u_Fx << " " << u_Fy << " " << u_Fz << " " << current_TCP_Frame[0] << " " << current_TCP_Frame[1] << " " << current_TCP_Frame[2] << " " << ref_TCP_Frame[0] << " " << ref_TCP_Frame[1] << " " << ref_TCP_Frame[2] << " " << current_TCP_Frame_adjusted[0] << " " << current_TCP_Frame_adjusted[1] << " " << new_TCP_Frame[0] << " " << new_TCP_Frame[1] << " " << Torques[0] << " " << Torques[1] << " " << Torques[2] << " " << "\n";
+		forcelog << elapsTime << " " << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " " << q[4] << " " << q[5] << " " << u_Fx << " " << u_Fy << " " << u_Fz << " " << current_TCP_Frame[0] << " " << current_TCP_Frame[1] << " " << current_TCP_Frame[2] << " " << ref_TCP_Frame[0] << " " << ref_TCP_Frame[1] << " " << ref_TCP_Frame[2] << " " << current_TCP_Frame_adjusted[0] << " " << current_TCP_Frame_adjusted[1] << " " << new_TCP_Frame[0] << " " << new_TCP_Frame[1] << " " << Torques[0] << " " << Torques[1] << " " << Torques[2] << " " << Forces[0] << " " << Forces[1] << " " << Forces[2] << " " << error_Fx << " " << error_Fy << " " << error_Fz << " " << "\n";
 		
 		
 		i=i+1;
