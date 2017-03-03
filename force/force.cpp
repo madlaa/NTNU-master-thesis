@@ -128,6 +128,38 @@ void rotate(gsl_vector *res,gsl_matrix *R, gsl_vector *inp,gsl_vector *t1,gsl_ve
 	gsl_blas_dgemv(CblasNoTrans ,1.0,R, t1,0.0,t2); 
 }  
 
+void gravityCompensation(std::vector<double> q)
+{
+	double gravityCompFTdata[6];
+	double biasWF[3];
+	double biasTF[3];
+
+	gsl_matrix *R = gsl_matrix_alloc(3,3);
+	gsl_matrix *invR = gsl_matrix_alloc(3,3);
+
+	int signum;
+	double apar[6] = {0,-0.42500,-0.39225,0,0,0};
+	double dpar[6] = {0.089159,0,0,0.10915,0.09465,0.0823};
+	gsl_permutation *p = gsl_permutation_alloc(6);
+
+	tfrotype tfkin;
+	R->data=tfkin.R;
+	ufwdkin(&tfkin,q.data(),apar,dpar);
+
+	gsl_linalg_LU_decomp(R,p,&signum);
+	gsl_linalg_LU_invert (R, p, invR)
+
+
+	for (int i=0;i<3;i++)
+	{
+		for (int j=0;j<3;j++) //bias_{Tool frame} = inverseR*bias_{World frame}
+		{
+			biasTF[i] += gsl_matrix_get(invR, i, j)*biasWF[j];
+			//gravityCompFTdata[j] = gsl_matrix_get(R, i, j)*rawFTdata[j];
+		}
+	}
+}
+
 void solveInverseJacobian(std::vector<double> q, double vw[6], double qd[6])
 {
 	gsl_vector *x = gsl_vector_alloc(6);
