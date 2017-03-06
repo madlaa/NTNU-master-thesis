@@ -7,6 +7,7 @@ int initFT = 1;
 int forceSleepTime = 10000; //usleep(10000) ~ 90 Hz --> run a bit faster than the fastest human reaction time -- currently involuntary muscle contractions at 24ms ~ 41,6 Hz
 //Fastest possible hardware update rate for the UR5 is set at 8ms ~ 125 Hz equivalent to usleep(8000)
 double rawFTdata[6];
+double biasTF[3]; // Tool frame (or TCP frame)
 
 
 void *getFTData(void *arg)
@@ -192,6 +193,36 @@ void adjustForce(double sq6, double cq6, double outF[3]) //Adjusting for weight 
 	outF[1] = 1+magY*sin(sq6/4+cq6+1)+magY;
 }
 
+
+void gravityCompensation(std::vector<double> q, double biasWF[3])
+{	
+	gsl_matrix *R = gsl_matrix_calloc(3,3);
+	gsl_matrix *invR = gsl_matrix_calloc(3,3);
+	
+	int signum;
+	double apar[6] = {0,-0.42500,-0.39225,0,0,0};
+	double dpar[6] = {0.089159,0,0,0.10915,0.09465,0.0823};
+	gsl_permutation *p = gsl_permutation_alloc(3);
+
+	tfrotype tfkin;
+	R->data=tfkin.R;
+	ufwdkin(&tfkin,q.data(),apar,dpar);
+
+	gsl_linalg_LU_decomp(R, p, &signum);
+	gsl_linalg_LU_invert (R, p, invR);
+
+	
+	biasTF[0] = biasTF[1] = biasTF[2] = 0;
+	for (int i=0; i<3; i++)
+	{
+		for (int j=0; j<3 ;j++) //bias_{Tool frame} = inverseR*bias_{World frame}
+		{
+			biasTF[3-i] += gsl_matrix_get(invR, i, j)*biasWF[j];
+			//gravityCompFTdata[j] = gsl_matrix_get(R, i, j)*rawFTdata[j];
+		}
+	}
+}
+
 void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_time, int force_mode, double f_ref)
 {
 	pthread_t forceID;
@@ -232,7 +263,8 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 	
 	double vw[6];
  
- 
+	double biasWF[3] = {rawFTdata[0], rawFTdata[1], rawFTdata[2]}; //World frame (or base frame)
+	
 	double biasFT[3] = {rawFTdata[0], rawFTdata[1], rawFTdata[2]};
 	double biasTorque[3] = {rawFTdata[3], rawFTdata[4], rawFTdata[5]};
 	
@@ -269,7 +301,7 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 	//Doublecheck PID controller tuning
 	if(force_mode == 1) // Compliance mode
 	{
-		Kp = -0.008; //Original: -0.005 // Tuned: -0.008
+		Kp = -0.005; //Original: -0.005 // Tuned: -0.008
 		Ki = -0.0003; //Original: -0.000025 //Tuned: -0.00085 or -0.0003
 		Kd = -0.000045; //Original: -0.000025 //Tuned: -0.00045
 		Kp_T = -0.3; //Original: -0.005;
@@ -312,6 +344,7 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 
 		//double Torques[3] = {rawFTdata[3]-biasTorque[3], rawFTdata[4]-biasTorque[4], rawFTdata[5]-biasTorque[5]};
 		double Torques[3] = {rawFTdata[3], rawFTdata[4], rawFTdata[5]};
+		//double Forces[3] = {rawFTdata[0]-biasTF[2], rawFTdata[1]-biasTF[1], rawFTdata[2]-biasTF[0]};
 		double Forces[3] = {rawFTdata[0]-biasFT[0], rawFTdata[1]-biasFT[1], rawFTdata[2]-biasFT[2]};
 		
 		double timeStamp = ur5->rt_interface_->robot_state_->getTime();
@@ -324,8 +357,9 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 		double current_FT_Frame[3] = {rawFTdata[0]-biasFT[0], rawFTdata[1]-biasFT[1], rawFTdata[2]-biasFT[2]};
 		forceTransformation(current_FT_Frame, current_TCP_Frame);
 		
-		
-		
+		gravityCompensation(q, biasWF); 
+		//Output: biasTF[0] = F_z, biasTF[1] = F_y, biasTF[2] = F_x. Speilvendt pga. orientering av FT sensor
+		//std::cout << "The current Tool frame (X,Y,Z) is: " << biasTF[0] << "  " << | " << biasTF[1] << " | " << biasTF[2] << " | " << std::endl;
 		double current_TCP_Frame_adjusted[3];
 		adjustForce(sq[5], q[5], current_TCP_Frame_adjusted); // Used for compansating force indused by the equiptment? Remove?
 		double new_TCP_Frame[3];
@@ -416,12 +450,12 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 		//Set different modes to exert a different rehabilitation strategy
 		if(force_mode == 1) // Compliance mode
 		{
-			vw[0] = u_Fy; //The mounting of the F/T sensor require some adjustments to the TCP <-> FT frames
-			vw[1] = -u_Fx; 
+			vw[0] = u_Fx; //The mounting of the F/T sensor require some adjustments to the TCP <-> FT frames
+			vw[1] = u_Fy; 
 			vw[2] = -u_Fz; 
-			vw[3] = 0;//u_Ty;
-			vw[4] = 0;//-u_Tx;
-			vw[5] = 0;//-u_Tz;
+			vw[3] = u_Tx;
+			vw[4] = u_Ty;
+			vw[5] = -u_Tz;
 		}
 		if(force_mode == 2) //Buoyancy mode
 		{
@@ -471,7 +505,7 @@ void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, in
 		//std::cout << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << "\n";
 	
 	
-		forcelog << elapsTime << " " << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " " << q[4] << " " << q[5] << " " << u_Fx << " " << u_Fy << " " << u_Fz << " " << current_TCP_Frame[0] << " " << current_TCP_Frame[1] << " " << current_TCP_Frame[2] << " " << ref_TCP_Frame[0] << " " << ref_TCP_Frame[1] << " " << ref_TCP_Frame[2] << " " << current_TCP_Frame_adjusted[0] << " " << current_TCP_Frame_adjusted[1] << " " << new_TCP_Frame[0] << " " << new_TCP_Frame[1] << " " << Torques[0] << " " << Torques[1] << " " << Torques[2] << " " << Forces[0] << " " << Forces[1] << " " << Forces[2] << " " << error_Fx << " " << error_Fy << " " << error_Fz << " " << "\n";
+		forcelog << elapsTime << " " << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " " << q[4] << " " << q[5] << " " << u_Fx << " " << u_Fy << " " << u_Fz << " " << error_Fx << " " << error_Fy << " " << error_Fz << " " << Torques[0] << " " << Torques[1] << " " << Torques[2] << " " << Forces[0] << " " << Forces[1] << " " << Forces[2] << " " << biasFT[0] << " " << biasFT[1] << " " << biasFT[2] << " " << biasTF[0] << " " << biasTF[1] << " " << biasTF[2] << " "  << "\n";
 		
 		
 		i=i+1;

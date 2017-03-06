@@ -426,7 +426,7 @@ int main()
 	
 	
 	// Approximate starting position
-	double qStart[6] = {0.1585, -2.5167, -1.3030, 0.6209, 1.3051, -1.04719755};
+	double qStart[6] = {0.1585, -2.5167, -1.3030, 0.6209, 1.3051, 0}; //-1.04719755
 	
 	// Reading and print current position
 	/*
