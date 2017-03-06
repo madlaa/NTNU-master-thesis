@@ -222,36 +222,6 @@ void adjustForce(double sq6, double cq6, double outF[3]) //Adjusting for weight 
 	outF[1] = 1+magY*sin(sq6/4+cq6+1)+magY;
 }
 
-
-void gravityCompensation(std::vector<double> q, double biasWF[3])
-{	
-	gsl_matrix *R = gsl_matrix_calloc(3,3);
-	gsl_matrix *invR = gsl_matrix_calloc(3,3);
-	
-	int signum;
-	double apar[6] = {0,-0.42500,-0.39225,0,0,0};
-	double dpar[6] = {0.089159,0,0,0.10915,0.09465,0.0823};
-	gsl_permutation *p = gsl_permutation_alloc(3);
-
-	tfrotype tfkin;
-	R->data=tfkin.R;
-	ufwdkin(&tfkin,q.data(),apar,dpar);
-
-	gsl_linalg_LU_decomp(R, p, &signum);
-	gsl_linalg_LU_invert (R, p, invR);
-
-	
-	biasTF[0] = biasTF[1] = biasTF[2] = 0;
-	for (int i=0; i<3; i++)
-	{
-		for (int j=0; j<3 ;j++) //bias_{Tool frame} = inverseR*bias_{World frame}
-		{
-			biasTF[3-i] += gsl_matrix_get(invR, i, j)*biasWF[j];
-			//gravityCompFTdata[j] = gsl_matrix_get(R, i, j)*rawFTdata[j];
-		}
-	}
-}
-
 void simpleForceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_time, int force_mode, double f_ref)
 {
 	pthread_t forceID;
