@@ -286,7 +286,7 @@ int main()
     // ROBOT CONNECTION
     std::condition_variable rt_msg_cond_;
     std::condition_variable msg_cond_;
-    UrDriver ur5(rt_msg_cond_, msg_cond_,"192.38.66.249",5000);
+    UrDriver ur5(rt_msg_cond_, msg_cond_,"10.42.0.63",5000);
     ur5.start();
     std::cout << "Connecting to robot ..." << std::endl;
     std::mutex msg_lock;
@@ -299,23 +299,23 @@ int main()
     std::cout << "Data received!" << std::endl;
     
     
-    
+    /*
     GripperSpeedControl(&ur5, &rt_msg_cond_, 40000);
     usleep(50000);
     GripperControl(&ur5, &rt_msg_cond_, 50);
     usleep(50000);
-    
+    */
     
     
     // APPROX. START LOCATIONS
-    double qBolt[6] = {2.06957, -2.18337, 1.97259, 0.21851, 0.498663, 2.98847};
-    double qTool[6] = {1.33906, -0.967229, 0.397516, 0.565406, -0.235619, 2.98923};
-    
+    //double qBolt[6] = {2.06957, -2.18337, 1.97259, 0.21851, 0.498663, 2.98847};
+    //double qTool[6] = {1.33906, -0.967229, 0.397516, 0.565406, -0.235619, 2.98923};
+    double qStart[6] = {0.44, -0.475, -0.375, 1.325, 0.777, 0525}; //Approximate starting position
     
     
     // START LOOKING FOR VALVE
-    moveSimpleJointDirect(&ur5, &rt_msg_cond_, qBolt, 0.5, 0.5);
-    
+    moveSimpleJointDirect(&ur5, &rt_msg_cond_, qStart, 0.5, 0.5);
+    /*
     
   
     
@@ -495,7 +495,7 @@ int main()
 	    wayPoint[3] = wayPoint[3]-0.060;
 	    moveSimpleJoint(&ur5, &rt_msg_cond_, wayPoint, 0, 0.2, 0.2);
 	    
-        }
+        }*/
     }
     ur5.halt();
     std::cout << "Disconnected!\n";

@@ -1,5 +1,5 @@
 GCC = g++ -std=c++11 -I../include
-CPPFLAGS = -std=c++11 -I../include  -I/usr/include/opencv2
+CPPFLAGS = -std=c++11 -I../include  -I/home/madsjl/Documents/NTNU-master-thesis/opencv2
 CXXFLAGS += $(shell pkg-config opencv --cflags)
 LIBS  += $(shell pkg-config opencv --libs)
 

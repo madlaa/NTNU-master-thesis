@@ -401,7 +401,30 @@ void rgbControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int status
 }
   
 
-  
+void introductionProcedure(int *force_mode, double *force_threshhold, double *torque_threshhold, double *buoyancy)
+{
+	//int force_mode = 1; // TriggerAssisted, Challange based, etc.
+	//double force_threshhold = 0;
+	//double torque_threshhold = 0;
+	std::cout << std::endl;
+	std::cout << "====== Robotic rehabilitation of upper-limb after stroke - 'rrulaf' ======" << std::endl;
+	std::cout << std::endl;
+	std::cout << "Currently avaliable force modes are: " << std::endl;
+	std::cout << "1. Compliance mode" << std::endl;
+	std::cout << "2. Buoyancy mode" << std::endl;
+	std::cout << "3. Random mode" << std::endl;
+	std::cout << std::endl;
+	std::cout << "Please enter the desired force mode. " << std::endl;
+	std::cin >> *force_mode;
+	if (*force_mode == 2)
+	{
+		std::cout << "Please enter a desired buoyancy [N] between 0-20 Newtons." << std::endl;
+		std::cin >> *buoyancy;
+	}
+	std::cout << std::endl;
+	std::cout << "Please enter the desired force threshold [N] and torque threshold [N] in the format: force_threshold [space] torque_threshold [enter]." << std::endl;
+	std::cin >> *force_threshhold >> *torque_threshhold;
+}
   
   
   
@@ -443,13 +466,18 @@ int main()
 	//moveSimpleJoint(&ur5, &rt_msg_cond_, qStart, 0, 0.2, 0.2);
 
 	// FORCE CONTROL
-	int force_mode = 1; // TriggerAssisted, Challange based, etc.
+	int force_mode = 3; // TriggerAssisted, Challange based, etc.
+	double force_threshhold = 0;
+	double torque_threshhold = 0;
+	double buoyancy = 20;
+	//introductionProcedure(&force_mode, &force_threshhold, &torque_threshhold, &buoyancy);
+	
 	std::cout << "Initializing force control. \n" << std::endl;
 	pthread_t forceID; //this is done inside force.cpp
 	//startFT(&forceID);
 	//std::cout << "Please enter the desired mode. \n Enter 1 for Compliance mode: " << std::endl;
 	//std::cin >> force_mode; 
-	simpleForceControl(&ur5, &rt_msg_cond_, 200, force_mode, 3);//forceControl(&ur5, &rt_msg_cond_, 5, 2, 5.0);
+	forceControl(&ur5, &rt_msg_cond_, 200, force_mode, force_threshhold, torque_threshhold, buoyancy);//forceControl(&ur5, &rt_msg_cond_, 5, 2, 5.0);
 	//simpleForceControl(&ur5, &rt_msg_cond_, 20, 2, 3);
 	usleep(10000);
 	

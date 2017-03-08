@@ -15,7 +15,7 @@ SOURCES = rrulaf.cpp \
 	../ur_modern_driver-master/src/do_output.cpp \
 	../ur_modern_driver-master/src/robot_state_RT.cpp \
 	../ur_modern_driver-master/src/ur_communication.cpp \
-	../ur_modern_driver-master/src/ur_realtime_communication.cpp
+	../ur_modern_driver-master/src/ur_realtime_communication.cpp 
 #../force/force.cpp
 # default rule, to compile everything
 all: $(TARGET)

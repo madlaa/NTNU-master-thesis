@@ -6,7 +6,7 @@ close all;
 clear all;
 %% Load data from file
 fileID = fopen('data/logs/forcelog');
-dim = 31; %time(1), q(6), s(6), etc..
+dim = 37; %time(1), q(6), s(6), etc..
 data_format = repmat('%f ', 1, dim);
 raw_data = textscan(fileID, data_format); %Remember to delete any incomplete log entries in the final row.
 [N, M] = size(raw_data{1,1});
@@ -24,6 +24,7 @@ torques = data(:, 20:22);
 forces = data(:, 23:25);
 biasFT = data(:, 26:28);
 biasTF = data(:, 29:31);
+rawFTdata = data(:, 32:37);
 %% Plot joint angles
 figure('Name','Joint angles');
 plot(elapsTime,q(:,1),elapsTime,q(:,2),elapsTime,q(:,3),elapsTime,q(:,4), elapsTime,q(:,5), elapsTime,q(:,6))
@@ -57,7 +58,7 @@ plot(elapsTime,forces(:,1),elapsTime,forces(:,2),elapsTime,forces(:,3))
 legend('F_x','F_y','F_z')
 title('Force sensor input');
 xlabel('Elapsed time [s]')
-ylabel('Torque sensor input [N]')
+ylabel('Force sensor input [N]')
 grid on;
 
 %% Plot force sensor input
@@ -66,14 +67,14 @@ plot(elapsTime,errors(:,1),elapsTime,errors(:,2),elapsTime,errors(:,3))
 legend('Error_{Fx}','Error_{Fy}','Error_{Fz}')
 title('Errors');
 xlabel('Elapsed time [s]')
-ylabel('Torque sensor input [N]')
+ylabel('Errors')
 grid on;
 
 %% Plot Tool frame input
 figure('Name','Tool frame bias (biasTF)');
-plot(elapsTime,biasTF(:,3),elapsTime,biasTF(:,2),elapsTime,biasTF(:,1)) 
+plot(elapsTime,biasTF(:,3), '--o', elapsTime,biasTF(:,2), '--', elapsTime,biasTF(:,1)) 
 hold on;
-plot(elapsTime,biasFT(:,1),elapsTime,biasFT(:,2),elapsTime,biasFT(:,3)) 
+plot(elapsTime,biasFT(:,1), '--o', elapsTime,biasFT(:,2), '--', elapsTime,biasFT(:,3)) 
 hold off;
 legend('biasTF_{Fx}','biasTF_{Fy}','biasTF_{Fz}', 'biasFT_{Fx}','biasFT_{Fy}','biasFT_{Fz}')
 title('Tool frame bias (biasTF)');
