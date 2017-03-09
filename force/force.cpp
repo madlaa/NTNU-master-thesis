@@ -36,7 +36,6 @@ void *getFTData(void *arg)
 	*(uint32*)&request[4] = htonl(NUM_SAMPLES); /* see section 9.1 in Net F/T user manual. */
 
 	/* Sending the request. */
-	//he = gethostbyname(argv[1]);
 	he = gethostbyname("10.42.0.8");
 
 
@@ -74,7 +73,6 @@ void *getFTData(void *arg)
 		double Tz = (double)resp.FTData[5]/scale_factor;
 	
 		rawFTdata[0] = Fx; rawFTdata[1] = Fy; rawFTdata[2] = Fz; rawFTdata[3] = Tx; rawFTdata[4] = Ty; rawFTdata[5] = Tz;
-		//std::cout << "Current F/T readings on X axis are: \n" << rawFTdata[0] << std::endl;
 		usleep(830);//usleep830 ~ 1200 Hz --> run a bit faster than FT broadcast frequency -- currently 1000 Hz
 	}
 }
@@ -88,7 +86,7 @@ void startFT(pthread_t *forceID)
 		//return -1;
 	}
 	std::cout << "Broadcasting force/torque data!" << std::endl;
-	usleep(500000);
+	usleep(200000);
 }
 
 void stopFT(pthread_t *forceID)
@@ -228,13 +226,13 @@ void adjustForce(double sq6, double cq6, double outF[3]) //Adjusting for weight 
 	outF[1] = 1+magY*sin(sq6/4+cq6+1)+magY;
 }
 
-void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_time, int force_mode, double f_ref, double t_ref, double buoyancy)
+void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_time, int force_mode, double f_ref, double t_ref, double buoyancy, double disturbance_scale)
 {
 	pthread_t forceID;
 	startFT(&forceID);	
 	
 	
-	std::cout << "Force control initiated - starting compliance mode ...\n";
+	std::cout << "Force control initiated - starting data logging ..." << std::endl;
 	std::ofstream forcelog;
 	forcelog.open("../data/logs/forcelog", std::ofstream::out);
 	//Control system for translation forces
@@ -244,6 +242,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	
 	double error_Fx = 0, error_Fy = 0, error_Fz = 0;
 	double prior_error_Fx = 0, prior_error_Fy = 0, prior_error_Fz = 0;
+	//double disturbance_Fx = 0, disturbance_Fy = 0, disturbance_Fz = 0;
 	
 	double u_Fx = 0, u_Fy = 0, u_Fz = 0;
 	
@@ -255,6 +254,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	
 	double error_Tx = 0, error_Ty = 0, error_Tz = 0;
 	double prior_error_Tx = 0, prior_error_Ty = 0, prior_error_Tz = 0;
+	//double disturbance_Tx = 0, disturbance_Ty = 0, disturbance_Tz = 0;
 	
 	double u_Tx = 0, u_Ty = 0, u_Tz = 0;
 	
@@ -300,8 +300,9 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	
 	if(fabs(angular_speed) > 0.5) 
 	{
-		angular_speed = -0.35;
-		std::cout << "Run-time too low -- setting angular speed to -0.35 rad/s" << std::endl;
+		//ur5->setSpeed(0,0,0,0,0,0,1);
+		std::cout << "============================= STOPPING! ============================" << std::endl;
+		std::cout << "Run-time too low -- setting angular speed to 1 rad/s" << std::endl;
 	}
 	
 	//Doublecheck PID controller tuning
@@ -313,9 +314,14 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	Ki_T = 0.003; //Original: -0.000025;
 	Kd_T = 0.000045;
 	
+	double disturbances[6] = {0,0,0,0,0,0}; //Fx, Fy, Fz, Tx, Ty, Tz
 	srand(time(NULL));
 	double randomDuration = rand() % 375 + 125;
-	double randomDisturbance = 0;
+	double randomDisturbances[6] = {0,0,0,0,0,0}; 
+	//double prior_randomDisturbances[6] = {0,0,0,0,0,0};
+	
+	
+	std::cout << "======================== FORCE CONTROL ACTIVE ========================" << std::endl;
 	
 	while(i<iter)
 	{
@@ -377,9 +383,9 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		}
 		else
 		{
-			error_Fx = Forces[0];
-			error_Fy = Forces[1];
-			error_Fz = Forces[2];
+			error_Fx = Forces[0];// + disturbances[0];
+			error_Fy = Forces[1] + buoyancy;// + disturbances[1];
+			error_Fz = Forces[2];// + disturbances[2];
 		}
 		if(fabs(Torques[0]) < (1+t_ref) && fabs(Torques[1]) < (1+t_ref) && fabs(Torques[2]) < (0.4+t_ref))
 		{
@@ -402,32 +408,44 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		if(fabs(error_Fx) > 50 || fabs(error_Fy) > 50 || fabs(error_Fz) > 50)
 		{
 			ur5->setSpeed(0,0,0,0,0,0,1);
-			std::cout << "============================== STOPPING ============================" << std::endl;
-			std::cout << "Force levels too large - stopping control!" << std::endl;
+			std::cout << "============================= STOPPING! ============================" << std::endl;
+			std::cout << "Force levels too large - stopping force control!" << std::endl;
 			break;
 		}
 		
 		if(fabs(error_Tx) > 25 || fabs(error_Ty) > 25 || fabs(error_Tz) > 25)
 		{
 			ur5->setSpeed(0,0,0,0,0,0,1);
-			std::cout << "============================== STOPPING ============================" << std::endl;
-			std::cout << "Torque levels too large - stopping control!" << std::endl;
+			std::cout << "============================= STOPPING! ============================" << std::endl;
+			std::cout << "Torque levels too large - stopping force control!" << std::endl;
 			break;
 		}
 		
 		
-		if (randomDuration < 0)
+		if (randomDuration < 1) 
 		{
-			randomDisturbance = (rand() % 20)-10;//Random buoyancy force between -10 and 9 Newton
-			randomDuration = rand() % 375 + 125; //Random duration between 1-3 seconds
-			std::cout << "The value of the disturbance is: " << randomDisturbance << std::endl;
+			/*
+			for (int i = 0; i<6; i++)
+			{
+				prior_disturbances[i] = disturbances[i];
+			}
+			*/
+			//Random disturbance force between -10 and 9 Newton 
+			// --> scaled down by (1/150)*disturbance_scale before implemented in controller
+			randomDisturbances[0] = (rand() % 30)-15;
+			randomDisturbances[1] = (rand() % 30)-15;
+			randomDisturbances[2] = (rand() % 30)-15;
+			
+			randomDisturbances[3] = (rand() % 20)-10;
+			randomDisturbances[4] = (rand() % 20)-10;
+			randomDisturbances[5] = (rand() % 20)-10;
+			
+			randomDuration = rand() % 500 + 250; //Random duration between 2-4 seconds
 		}
 		
-		std::cout << std::endl;
-		std::cout << "The value of Force[1] is: " << Forces[1] << std::endl;
 		
 		//===============Controller=====================
-		//Translational forces
+		//Translational forces - 3DOF
 		integrator_Fx = integrator_Fx + error_Fx;
 		integrator_Fy = integrator_Fy + error_Fy;
 		integrator_Fz = integrator_Fz + error_Fz;
@@ -435,12 +453,12 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		derivator_Fx = error_Fx - prior_error_Fx;
 		derivator_Fy = error_Fy - prior_error_Fy;
 		derivator_Fz = error_Fz - prior_error_Fz;
+		//ToDo: Implement disturbance as a BIAS. The current solution does not give the desired outcome
+		u_Fx = Kp*error_Fx + Ki*integrator_Fx + Kd*derivator_Fx;// + disturbances[0];
+		u_Fy = Kp*error_Fy + Ki*integrator_Fy + Kd*derivator_Fy;// + disturbances[1];
+		u_Fz = Kp*error_Fz + Ki*integrator_Fz + Kd*derivator_Fz;// + disturbances[2];
 		
-		u_Fx = Kp*error_Fx + Ki*integrator_Fx + Kd*derivator_Fx;
-		u_Fy = Kp*error_Fy + Ki*integrator_Fy + Kd*derivator_Fy;
-		u_Fz = Kp*error_Fz + Ki*integrator_Fz + Kd*derivator_Fz;
-		
-		//Rotational forces - torques
+		//Rotational torques - 3DOF
 		integrator_Tx = integrator_Tx + error_Tx;
 		integrator_Ty = integrator_Ty + error_Ty;
 		integrator_Tz = integrator_Tz + error_Tz;
@@ -449,9 +467,9 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		derivator_Ty = error_Ty - prior_error_Ty;
 		derivator_Tz = error_Tz - prior_error_Tz;
 		
-		u_Tx = Kp_T*error_Tx + Ki_T*integrator_Tx + Kd_T*derivator_Tx;
-		u_Ty = Kp_T*error_Ty + Ki_T*integrator_Ty + Kd_T*derivator_Ty;
-		u_Tz = Kp_T*error_Tz + Ki_T*integrator_Tz + Kd_T*derivator_Tz;
+		u_Tx = Kp_T*error_Tx + Ki_T*integrator_Tx + Kd_T*derivator_Tx + disturbances[3];
+		u_Ty = Kp_T*error_Ty + Ki_T*integrator_Ty + Kd_T*derivator_Ty + disturbances[4];
+		u_Tz = Kp_T*error_Tz + Ki_T*integrator_Tz + Kd_T*derivator_Tz + disturbances[5];
 		
 		//Set different modes to exert a different rehabilitation strategy
 		if(force_mode == 1) // Compliance mode
@@ -466,13 +484,13 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		if(force_mode == 2) //Buoyancy mode
 		{
 			vw[0] = u_Fx;
-			vw[1] = u_Fy; 
+			vw[1] = u_Fy;// + buoyancy; 
 			vw[2] = u_Fz; 
 			vw[3] = 0;//u_Tx;
 			vw[4] = 0;//u_Ty;
 			vw[5] = 0;//u_Tz;
 			
-			biasFT[1] = buoyancy; // This generates a constant force of 20N on the Y-axis. The arm is "floating".
+			//biasFT[1] = -buoyancy; // This generates a constant force on the Y-axis.
 		}
 		if(force_mode == 3) //Random mode
 		{
@@ -483,20 +501,52 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			vw[4] = 0;//u_Ty;
 			vw[5] = 0;//u_Tz;
 			
-			biasFT[1] = randomDisturbance; //ToDo: Implement negative random disturbances
+			/*
+			for (int i = 0; i<6; i++)
+			{
+				if (disturbances[i] > (randomDisturbances[i]/150)*disturbance_scale && fabs(disturbances[i]) > 0.00001)
+				{
+					disturbances[i] = disturbances[i]/1.2; //Gentle step-down
+					//prior_disturbances[i] = disturbances[i];
+				}
+				else if (disturbances[i] < (randomDisturbances[i]/150)*disturbance_scale && fabs(disturbances[i]) > 0.00001)
+				{
+					disturbances[i] = disturbances[i]*1.2; //Gentle step-up
+				}
+				else
+				{
+					disturbances[i] = (randomDisturbances[i]/150)*disturbance_scale;
+				}
+				/*
+				else if (randomDisturdances[i] != prior_randomDisturbances[i] && disturbances[i] < ((randomDisturdances[i])/150)*disturbance_scale)
+				{
+					disturbances[i] = disturbance[i]*1.2; //Gentle step-up
+				}
+				else
+				{
+					disturbances[i] = (randomDisturbances[i]/150)*disturbance_scale;
+				}
+			}
+			*/
+			for (int j = 0; j<6; j++)
+			{
+				disturbances[j] = ((randomDisturbances[j]/150)*disturbance_scale);///randomDuration;
+			}
 			
 			randomDuration = randomDuration-1;
 		}
-		if(force_mode == 4)
+		if(force_mode == 4) //2-plane mode
 		{
-			vw[0] = 0;
-			vw[1] = 0; 
-			vw[2] = 0; 
+			vw[0] = u_Fx;
+			vw[1] = 0;//u_Fy;
+			vw[2] = u_Fz;
 			vw[3] = 0;
 			vw[4] = 0;
-			vw[5] = angular_speed;
+			vw[5] = 0;//angular_speed;
 		}
-	
+		
+		//FUTURE WORK
+		//Suggested modes: Syrup mode (less agressive controller parameters), 2-plane mode, 1-plane mode, functional reach
 	
 		solveInverseJacobian(q, vw, speed);
 		
@@ -512,10 +562,8 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		prior_error_Tx = error_Tx; 
 		prior_error_Ty = error_Ty;
 		prior_error_Tz = error_Tz;
-		//std::cout << elapsTime << "\t" << i << std::endl;
-		//std::cout << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << "\n";
-	
-	
+		
+		
 		forcelog << elapsTime << " " << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " " << q[4] << " " << q[5] << " " << u_Fx << " " << u_Fy << " " << u_Fz << " " << error_Fx << " " << error_Fy << " " << error_Fz << " " << Torques[0] << " " << Torques[1] << " " << Torques[2] << " " << Forces[0] << " " << Forces[1] << " " << Forces[2] << " " << biasFT[0] << " " << biasFT[1] << " " << biasFT[2] << " " << biasTF[0] << " " << biasTF[1] << " " << biasTF[2] << " " << rawFTdata[0] << " " << rawFTdata[1] << " " << rawFTdata[2] << " " << rawFTdata[3] << " " << rawFTdata[4] << " " << rawFTdata[5] << " " << "\n";
 		
 		

@@ -1,8 +1,8 @@
 /*Written by Mads Johan Laastad as part of a master thesis in Cybernetics and Robotics at the Norwegian University of Science and Technology (NTNU) during the spring of 2017. The author can not guarrantee for the safety of anyone that desides to use this code in their own projects. This module is named rrulaf after the title of the master thesis it is part of, rrulaf is an acronyme for "Robotic Rehabilitation of Upper-Limb After Stroke". Feel free to contact the autor at laastad.m@gmail.com if you have any questions.
-# NETWORK
-#
-# The IP address can be found in the PolyScope interface (tablet) of the robot.
-# SETUP Robot -> Setup NETWORK (requires password: "ngr12") -> IP address
+
+NETWORK:
+The IP address can be found in the PolyScope interface (tablet) of the robot.
+SETUP Robot -> Setup NETWORK (requires password: "ngr12") -> IP address
 UR5_IP = "10.42.0.63"
 UR5_HOSTNAME = 'ur-2012208984' #requires dns.
 */
@@ -401,11 +401,8 @@ void rgbControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int status
 }
   
 
-void introductionProcedure(int *force_mode, double *force_threshhold, double *torque_threshhold, double *buoyancy)
+void introductionProcedure(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int *force_mode, double *force_threshold, double *torque_threshold, double *buoyancy, double *disturbance_scale)
 {
-	//int force_mode = 1; // TriggerAssisted, Challange based, etc.
-	//double force_threshhold = 0;
-	//double torque_threshhold = 0;
 	std::cout << std::endl;
 	std::cout << "====== Robotic rehabilitation of upper-limb after stroke - 'rrulaf' ======" << std::endl;
 	std::cout << std::endl;
@@ -413,21 +410,61 @@ void introductionProcedure(int *force_mode, double *force_threshhold, double *to
 	std::cout << "1. Compliance mode" << std::endl;
 	std::cout << "2. Buoyancy mode" << std::endl;
 	std::cout << "3. Random mode" << std::endl;
+	std::cout << "4. 2-plane mode" << std::endl;
 	std::cout << std::endl;
-	std::cout << "Please enter the desired force mode. " << std::endl;
+	std::cout << "Please enter the desired force mode. : ";
 	std::cin >> *force_mode;
+	if (*force_mode < 0 || *force_mode > 4)
+	{
+		std::cout << std::endl;
+		std::cout << "ERROR: Invalid input --> value(s) defaults to 1 ..." << std::endl;
+		std::cout << std::endl;
+		*force_mode = 1;
+	}
 	if (*force_mode == 2)
 	{
-		std::cout << "Please enter a desired buoyancy [N] between 0-20 Newtons." << std::endl;
+		std::cout << "Please enter a desired buoyancy [N] between 0-25 Newtons." << std::endl;
 		std::cin >> *buoyancy;
+		if (*buoyancy < 0 || *buoyancy > 25)
+		{
+			std::cout << std::endl;
+			std::cout << "ERROR: Invalid input --> value(s) defaults to 0 ..." << std::endl;
+			std::cout << std::endl;
+			*buoyancy = 0;
+		}
 	}
+	if (*force_mode == 3)
+	{
+		std::cout << "Please enter a desired disturbance scale between 0-1." << std::endl;
+		std::cin >> *disturbance_scale;
+		if (*disturbance_scale < 0 || *disturbance_scale > 1)
+		{
+			std::cout << std::endl;
+			std::cout << "ERROR: Invalid input --> value(s) defaults to 0 ..." << std::endl;
+			std::cout << std::endl;
+			*disturbance_scale = 0;
+		}
+	}
+	if (*force_mode == 4)
+	{
+		std::cout << "Move the robot to the desired staring position. It will be compliant for the next 10 seconds. " << std::endl;
+		forceControl(ur5, rt_msg_cond_, 10, 1, 0, 0, 0, 0);
+		std::cout << "Hopefully, the robot is now in the correct position. Restart program if another configuration is desired." << std::endl;
+	}
+	
 	std::cout << std::endl;
-	std::cout << "Please enter the desired force threshold [N] and torque threshold [N] in the format: force_threshold [space] torque_threshold [enter]." << std::endl;
-	std::cin >> *force_threshhold >> *torque_threshhold;
+	std::cout << "Please enter the desired force threshold [N] and torque threshold [N] in the range 0-10 Newtons: \n  force_threshold [space] torque_threshold [enter]: " ;
+	std::cin >> *force_threshold >> *torque_threshold;
+	if (*force_threshold < 0 || *force_threshold > 10 || *torque_threshold < 0 || *torque_threshold > 10)
+	{
+		std::cout << std::endl;
+		std::cout << "ERROR: Invalid input --> value(s) defaults to 0 ..." << std::endl;
+		std::cout << std::endl;
+		*force_threshold = *torque_threshold = 0;
+	}
 }
-  
-  
-  
+
+
 int main()
 {
   
@@ -446,12 +483,6 @@ int main()
 	}	
 	std::cout << "Data received!" << std::endl;
 	
-	
-	
-	// Approximate starting position
-	double qStart[6] = {0.1585, -2.5167, -1.3030, 0.6209, 1.3051, 0}; //-1.04719755
-	
-	// Reading and print current position
 	/*
 	double q[6];
 	getq(&ur5, &rt_msg_cond_, q);	
@@ -460,25 +491,29 @@ int main()
 	std::cout << "Current pose is: " << TargetString << std::endl;
 	*/
 	
+	// Starting position with good range of motion and minimal self-collision 
+	double qStart[6] = {0.0078, -2.5012, -1.5813, -2.2244, -1.8349, 0};//{0.1585, -2.5167, -1.3030, 0.6209, 1.3051, 0}; //-1.04719755
 	// MOVE TO STARING POINT
+	std::cout << "======================== POSITION CONTROL ACTIVE ========================" << std::endl;
 	std::cout << "Moving to staring location. " << std::endl;
 	moveSimpleJointDirect(&ur5, &rt_msg_cond_, qStart, 1, 1);
 	//moveSimpleJoint(&ur5, &rt_msg_cond_, qStart, 0, 0.2, 0.2);
 
 	// FORCE CONTROL
-	int force_mode = 3; // TriggerAssisted, Challange based, etc.
-	double force_threshhold = 0;
-	double torque_threshhold = 0;
+	int force_mode = 2;
+	double force_threshold = 0;
+	double torque_threshold = 0;
 	double buoyancy = 20;
-	//introductionProcedure(&force_mode, &force_threshhold, &torque_threshhold, &buoyancy);
+	double disturbance_scale = 1;
+	//introductionProcedure(&ur5, &rt_msg_cond_, &force_mode, &force_threshhold, &torque_threshhold, &buoyancy, &disturbance_scale);
 	
 	std::cout << "Initializing force control. \n" << std::endl;
 	pthread_t forceID; //this is done inside force.cpp
 	//startFT(&forceID);
 	//std::cout << "Please enter the desired mode. \n Enter 1 for Compliance mode: " << std::endl;
 	//std::cin >> force_mode; 
-	forceControl(&ur5, &rt_msg_cond_, 200, force_mode, force_threshhold, torque_threshhold, buoyancy);//forceControl(&ur5, &rt_msg_cond_, 5, 2, 5.0);
-	//simpleForceControl(&ur5, &rt_msg_cond_, 20, 2, 3);
+	forceControl(&ur5, &rt_msg_cond_, 200, force_mode, force_threshold, torque_threshold, buoyancy, disturbance_scale);
+	
 	usleep(10000);
 	
 	stopFT(&forceID);
