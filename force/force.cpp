@@ -73,7 +73,8 @@ void *getFTData(void *arg)
 		double Tz = (double)resp.FTData[5]/scale_factor;
 	
 		rawFTdata[0] = Fx; rawFTdata[1] = Fy; rawFTdata[2] = Fz; rawFTdata[3] = Tx; rawFTdata[4] = Ty; rawFTdata[5] = Tz;
-		usleep(830);//usleep830 ~ 1200 Hz --> run a bit faster than FT broadcast frequency -- currently 1000 Hz
+		usleep(3800); // 4000 microseconds ~ 250 Hz is current FT broadcast frequency
+		//usleep830 ~ 1200 Hz --> run a bit faster than FT broadcast frequency -- currently 1000 Hz
 	}
 }
 
@@ -306,9 +307,9 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	}
 	
 	//Doublecheck PID controller tuning
-	Kp = 0.005; //Original: -0.005 // Tuned: -0.008
-	Ki = 0.0002; //Original: -0.000025 //Tuned: -0.00085 or -0.0003
-	Kd = 0.000045; //Original: -0.000025 //Tuned: -0.00045
+	Kp = 0.001;//0.005; //Original: -0.005 // Tuned: -0.008
+	Ki = 0;//0.0002; //Original: -0.000025 //Tuned: -0.00085 or -0.0003
+	Kd = 0.0001;//0.0002;//0.000045; //Original: -0.000025 //Tuned: -0.00045
 	
 	Kp_T = 0.3; //Original: -0.005;
 	Ki_T = 0.003; //Original: -0.000025;
@@ -320,6 +321,8 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	double randomDisturbances[6] = {0,0,0,0,0,0}; 
 	//double prior_randomDisturbances[6] = {0,0,0,0,0,0};
 	
+	double testTime = 500; //4 seconds test
+	double test_force = 5; //5 Newton step responce
 	
 	std::cout << "======================== FORCE CONTROL ACTIVE ========================" << std::endl;
 	
@@ -369,6 +372,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
    		
    		//Only update error if one of the forces exeedes a given threshhold (badly implemented low-pass filer)
    		//Vibrations in the manipulator transends to the end effector and gets interpeted as new inputs without this lowpass filter
+   		/*
    		if(fabs(Forces[0]) < (2+f_ref) && fabs(Forces[1]) < (2+f_ref) && fabs(Forces[2]) < (2+f_ref))
    		{
 			error_Fx = error_Fx/1.2; //Using [variable/1.2] to ensure a "soft" stopping behaviour
@@ -383,10 +387,30 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		}
 		else
 		{
+			//ToDo: Give the different modes access to the error variables. Generates the desired buoyancy without the uncontrolled desent. 
 			error_Fx = Forces[0];// + disturbances[0];
-			error_Fy = Forces[1] + buoyancy;// + disturbances[1];
+			error_Fy = Forces[1];// + buoyancy;// + disturbances[1];
 			error_Fz = Forces[2];// + disturbances[2];
 		}
+		*/
+		error_Fz = test_force + Forces[2];
+		/*
+		if (testTime < 100 && testTime > 50)
+		{
+			error_Fy = test_force;
+		}
+		else
+		{
+			error_Fy = 0;
+		}*/
+		if (testTime < 0)
+		{
+			ur5->setSpeed(0,0,0,0,0,0,1);
+			break;
+		}
+		testTime = testTime -1;
+		
+		
 		if(fabs(Torques[0]) < (1+t_ref) && fabs(Torques[1]) < (1+t_ref) && fabs(Torques[2]) < (0.4+t_ref))
 		{
 			error_Tx = error_Tx/1.2;
@@ -421,8 +445,8 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			break;
 		}
 		
-		
-		if (randomDuration < 1) 
+		//GENERATING DISTURANCES
+		if (force_mode == 3 && randomDuration < 1) 
 		{
 			/*
 			for (int i = 0; i<6; i++)
@@ -458,7 +482,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		u_Fy = Kp*error_Fy + Ki*integrator_Fy + Kd*derivator_Fy;// + disturbances[1];
 		u_Fz = Kp*error_Fz + Ki*integrator_Fz + Kd*derivator_Fz;// + disturbances[2];
 		
-		//Rotational torques - 3DOF
+		//Rotational torques
 		integrator_Tx = integrator_Tx + error_Tx;
 		integrator_Ty = integrator_Ty + error_Ty;
 		integrator_Tz = integrator_Tz + error_Tz;
@@ -477,9 +501,9 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			vw[0] = u_Fx;
 			vw[1] = u_Fy; 
 			vw[2] = u_Fz; 
-			vw[3] = u_Tx;
-			vw[4] = u_Ty;
-			vw[5] = u_Tz;
+			vw[3] = 0;//u_Tx;
+			vw[4] = 0;//u_Ty;
+			vw[5] = 0;//u_Tz;
 		}
 		if(force_mode == 2) //Buoyancy mode
 		{
@@ -538,7 +562,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		if(force_mode == 4) //2-plane mode
 		{
 			vw[0] = u_Fx;
-			vw[1] = 0;//u_Fy;
+			vw[1] = 0;
 			vw[2] = u_Fz;
 			vw[3] = 0;
 			vw[4] = 0;
@@ -564,7 +588,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		prior_error_Tz = error_Tz;
 		
 		
-		forcelog << elapsTime << " " << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " " << q[4] << " " << q[5] << " " << u_Fx << " " << u_Fy << " " << u_Fz << " " << error_Fx << " " << error_Fy << " " << error_Fz << " " << Torques[0] << " " << Torques[1] << " " << Torques[2] << " " << Forces[0] << " " << Forces[1] << " " << Forces[2] << " " << biasFT[0] << " " << biasFT[1] << " " << biasFT[2] << " " << biasTF[0] << " " << biasTF[1] << " " << biasTF[2] << " " << rawFTdata[0] << " " << rawFTdata[1] << " " << rawFTdata[2] << " " << rawFTdata[3] << " " << rawFTdata[4] << " " << rawFTdata[5] << " " << "\n";
+		forcelog << elapsTime << " " << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " " << q[4] << " " << q[5] << " " << rawFTdata[0] << " " << rawFTdata[1] << " " << rawFTdata[2] << " " << rawFTdata[3] << " " << rawFTdata[4] << " " << rawFTdata[5] << " " << Forces[0] << " " << Forces[1] << " " << Forces[2] << " " << Torques[0] << " " << Torques[1] << " " << Torques[2] << " " << error_Fx << " " << error_Fy << " " << error_Fz << " " << error_Tx << " " << error_Ty << " " << error_Tz << " " << u_Fx << " " << u_Fy << " " << u_Fz << " " << u_Tx << " " << u_Ty << " " << u_Tz << " " << biasFT[0] << " " << biasFT[1] << " " << biasFT[2] << " " << biasTF[0] << " " << biasTF[1] << " " << biasTF[2] << " "  << "\n";
 		
 		
 		i = i+1;

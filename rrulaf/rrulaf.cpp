@@ -483,28 +483,31 @@ int main()
 	}	
 	std::cout << "Data received!" << std::endl;
 	
-	/*
+	
+	//Displays current pose
 	double q[6];
 	getq(&ur5, &rt_msg_cond_, q);	
 	char TargetString[200];
 	sprintf(TargetString, "movel([%.4f, %.4f, %.4f, %.4f, %.4f, %.4f], %.4f, %.4f)\n", q[0], q[1], q[2], q[3], q[4], q[5], 0.2, 0.2);
 	std::cout << "Current pose is: " << TargetString << std::endl;
-	*/
+	
 	
 	// Starting position with good range of motion and minimal self-collision 
-	double qStart[6] = {0.0078, -2.5012, -1.5813, -2.2244, -1.8349, 0};//{0.1585, -2.5167, -1.3030, 0.6209, 1.3051, 0}; //-1.04719755
+	double qStart[6] = {0.0078, -2.5012, -1.5813, -2.2244, -1.8349, 0};
+	double qTest[6] = {-0.3552, -2.2918, -2.3594, -1.6499, -4.3131, 0.5255};
 	// MOVE TO STARING POINT
 	std::cout << "======================== POSITION CONTROL ACTIVE ========================" << std::endl;
 	std::cout << "Moving to staring location. " << std::endl;
-	moveSimpleJointDirect(&ur5, &rt_msg_cond_, qStart, 1, 1);
+	//moveSimpleJointDirect(&ur5, &rt_msg_cond_, qStart, 1, 1);
+	moveSimpleJointDirect(&ur5, &rt_msg_cond_, qTest, 1, 1);
 	//moveSimpleJoint(&ur5, &rt_msg_cond_, qStart, 0, 0.2, 0.2);
 
 	// FORCE CONTROL
-	int force_mode = 2;
+	int force_mode = 1;
 	double force_threshold = 0;
 	double torque_threshold = 0;
-	double buoyancy = 20;
-	double disturbance_scale = 1;
+	double buoyancy = 0;
+	double disturbance_scale = 0;
 	//introductionProcedure(&ur5, &rt_msg_cond_, &force_mode, &force_threshhold, &torque_threshhold, &buoyancy, &disturbance_scale);
 	
 	std::cout << "Initializing force control. \n" << std::endl;
