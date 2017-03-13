@@ -498,12 +498,12 @@ int main()
 	// MOVE TO STARING POINT
 	std::cout << "======================== POSITION CONTROL ACTIVE ========================" << std::endl;
 	std::cout << "Moving to staring location. " << std::endl;
-	//moveSimpleJointDirect(&ur5, &rt_msg_cond_, qStart, 1, 1);
-	moveSimpleJointDirect(&ur5, &rt_msg_cond_, qTest, 1, 1);
+	moveSimpleJointDirect(&ur5, &rt_msg_cond_, qStart, 1, 1);
+	//moveSimpleJointDirect(&ur5, &rt_msg_cond_, qTest, 1, 1);
 	//moveSimpleJoint(&ur5, &rt_msg_cond_, qStart, 0, 0.2, 0.2);
 
 	// FORCE CONTROL
-	int force_mode = 1;
+	int force_mode = 4;
 	double force_threshold = 0;
 	double torque_threshold = 0;
 	double buoyancy = 0;

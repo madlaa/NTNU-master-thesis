@@ -259,7 +259,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	
 	double u_Tx = 0, u_Ty = 0, u_Tz = 0;
 	
-	
+	double references[6] = {0,0,0,0,0,0}; //ref_Fx, ref_Fy, ref_Fz, ref_Tx, ref_Ty, ref_Tz
 	//=======================================================================
 	double speed[6] = {0,0,0,0,0,0};
 	
@@ -307,22 +307,22 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	}
 	
 	//Doublecheck PID controller tuning
-	Kp = 0.001;//0.005; //Original: -0.005 // Tuned: -0.008
-	Ki = 0;//0.0002; //Original: -0.000025 //Tuned: -0.00085 or -0.0003
-	Kd = 0.0001;//0.0002;//0.000045; //Original: -0.000025 //Tuned: -0.00045
+	Kp = 0.005;//0.005; //Original: -0.005 // Tuned: -0.008 or 0.005
+	Ki = 0.0002;//0.0002; //Original: -0.000025 //Tuned: -0.00085 or -0.0003
+	Kd = 0.0002;//0.0002;//0.000045; //Original: -0.000025 //Tuned: -0.00045
 	
 	Kp_T = 0.3; //Original: -0.005;
 	Ki_T = 0.003; //Original: -0.000025;
 	Kd_T = 0.000045;
 	
 	double disturbances[6] = {0,0,0,0,0,0}; //Fx, Fy, Fz, Tx, Ty, Tz
+	
 	srand(time(NULL));
 	double randomDuration = rand() % 375 + 125;
-	double randomDisturbances[6] = {0,0,0,0,0,0}; 
-	//double prior_randomDisturbances[6] = {0,0,0,0,0,0};
+	double randomDisturbances[6] = {0,0,0,0,0,0};
 	
-	double testTime = 500; //4 seconds test
-	double test_force = 5; //5 Newton step responce
+	double testTime = 500+500; //4 seconds test
+	double test_force = 10; //Newton step responce
 	
 	std::cout << "======================== FORCE CONTROL ACTIVE ========================" << std::endl;
 	
@@ -372,10 +372,11 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
    		
    		//Only update error if one of the forces exeedes a given threshhold (badly implemented low-pass filer)
    		//Vibrations in the manipulator transends to the end effector and gets interpeted as new inputs without this lowpass filter
-   		/*
-   		if(fabs(Forces[0]) < (2+f_ref) && fabs(Forces[1]) < (2+f_ref) && fabs(Forces[2]) < (2+f_ref))
+   		
+   		//FORCE ERROR UPDATES
+   		if(fabs(Forces[0]) < (2) && fabs(Forces[1]) < (2) && fabs(Forces[2]) < (2))
    		{
-			error_Fx = error_Fx/1.2; //Using [variable/1.2] to ensure a "soft" stopping behaviour
+			error_Fx = error_Fx/1.2; //Gentle step-down
 			error_Fy = error_Fy/1.2;
 			error_Fz = error_Fz/1.2;
 			
@@ -386,14 +387,19 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			
 		}
 		else
-		{
-			//ToDo: Give the different modes access to the error variables. Generates the desired buoyancy without the uncontrolled desent. 
-			error_Fx = Forces[0];// + disturbances[0];
-			error_Fy = Forces[1];// + buoyancy;// + disturbances[1];
-			error_Fz = Forces[2];// + disturbances[2];
+		{	
+			error_Fx = Forces[0] + references[0];
+			error_Fy = Forces[1] + references[1];
+			error_Fz = Forces[2] + references[2];	
 		}
+		
+		//TESTING
+		/*
+		error_Fx = Forces[0] + disturbances[0];
+		error_Fy = Forces[1] + disturbances[1];// + buoyancy;//
+		error_Fz = Forces[2] + disturbances[2];
 		*/
-		error_Fz = test_force + Forces[2];
+		//error_Fy = -test_force + Forces[2];
 		/*
 		if (testTime < 100 && testTime > 50)
 		{
@@ -402,15 +408,16 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		else
 		{
 			error_Fy = 0;
-		}*/
+		}
 		if (testTime < 0)
 		{
 			ur5->setSpeed(0,0,0,0,0,0,1);
 			break;
 		}
 		testTime = testTime -1;
+		*/
 		
-		
+		//TORQUE ERROR UPDATES
 		if(fabs(Torques[0]) < (1+t_ref) && fabs(Torques[1]) < (1+t_ref) && fabs(Torques[2]) < (0.4+t_ref))
 		{
 			error_Tx = error_Tx/1.2;
@@ -428,7 +435,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	   		error_Tz = Torques[2];
 		}
 
-		
+		//SAFETY MECHANISM 
 		if(fabs(error_Fx) > 50 || fabs(error_Fy) > 50 || fabs(error_Fz) > 50)
 		{
 			ur5->setSpeed(0,0,0,0,0,0,1);
@@ -445,26 +452,14 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			break;
 		}
 		
-		//GENERATING DISTURANCES
+		//GENERATING RANDOM DISTURANCES
 		if (force_mode == 3 && randomDuration < 1) 
 		{
-			/*
-			for (int i = 0; i<6; i++)
+			for (int j = 0; j<6; j++)
 			{
-				prior_disturbances[i] = disturbances[i];
+				randomDisturbances[j] = (rand() % 30)-15; //Force between -15 and 14 Newton 
 			}
-			*/
-			//Random disturbance force between -10 and 9 Newton 
-			// --> scaled down by (1/150)*disturbance_scale before implemented in controller
-			randomDisturbances[0] = (rand() % 30)-15;
-			randomDisturbances[1] = (rand() % 30)-15;
-			randomDisturbances[2] = (rand() % 30)-15;
-			
-			randomDisturbances[3] = (rand() % 20)-10;
-			randomDisturbances[4] = (rand() % 20)-10;
-			randomDisturbances[5] = (rand() % 20)-10;
-			
-			randomDuration = rand() % 500 + 250; //Random duration between 2-4 seconds
+			randomDuration = rand() % 500 + 250; //Duration between 2-4 seconds
 		}
 		
 		
@@ -477,12 +472,12 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		derivator_Fx = error_Fx - prior_error_Fx;
 		derivator_Fy = error_Fy - prior_error_Fy;
 		derivator_Fz = error_Fz - prior_error_Fz;
-		//ToDo: Implement disturbance as a BIAS. The current solution does not give the desired outcome
-		u_Fx = Kp*error_Fx + Ki*integrator_Fx + Kd*derivator_Fx;// + disturbances[0];
-		u_Fy = Kp*error_Fy + Ki*integrator_Fy + Kd*derivator_Fy;// + disturbances[1];
-		u_Fz = Kp*error_Fz + Ki*integrator_Fz + Kd*derivator_Fz;// + disturbances[2];
 		
-		//Rotational torques
+		u_Fx = Kp*error_Fx + Ki*integrator_Fx + Kd*derivator_Fx;
+		u_Fy = Kp*error_Fy + Ki*integrator_Fy + Kd*derivator_Fy;
+		u_Fz = Kp*error_Fz + Ki*integrator_Fz + Kd*derivator_Fz;
+		
+		//Rotational torques - 3DOF
 		integrator_Tx = integrator_Tx + error_Tx;
 		integrator_Ty = integrator_Ty + error_Ty;
 		integrator_Tz = integrator_Tz + error_Tz;
@@ -491,11 +486,11 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		derivator_Ty = error_Ty - prior_error_Ty;
 		derivator_Tz = error_Tz - prior_error_Tz;
 		
-		u_Tx = Kp_T*error_Tx + Ki_T*integrator_Tx + Kd_T*derivator_Tx + disturbances[3];
-		u_Ty = Kp_T*error_Ty + Ki_T*integrator_Ty + Kd_T*derivator_Ty + disturbances[4];
-		u_Tz = Kp_T*error_Tz + Ki_T*integrator_Tz + Kd_T*derivator_Tz + disturbances[5];
+		u_Tx = Kp_T*error_Tx + Ki_T*integrator_Tx + Kd_T*derivator_Tx;
+		u_Ty = Kp_T*error_Ty + Ki_T*integrator_Ty + Kd_T*derivator_Ty;
+		u_Tz = Kp_T*error_Tz + Ki_T*integrator_Tz + Kd_T*derivator_Tz;
 		
-		//Set different modes to exert a different rehabilitation strategy
+		//FORCE MODES
 		if(force_mode == 1) // Compliance mode
 		{
 			vw[0] = u_Fx;
@@ -508,13 +503,13 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		if(force_mode == 2) //Buoyancy mode
 		{
 			vw[0] = u_Fx;
-			vw[1] = u_Fy;// + buoyancy; 
+			vw[1] = u_Fy;
 			vw[2] = u_Fz; 
 			vw[3] = 0;//u_Tx;
 			vw[4] = 0;//u_Ty;
 			vw[5] = 0;//u_Tz;
 			
-			//biasFT[1] = -buoyancy; // This generates a constant force on the Y-axis.
+			references[1] = buoyancy; // This generates a constant force on the Y-axis.
 		}
 		if(force_mode == 3) //Random mode
 		{
@@ -525,41 +520,36 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			vw[4] = 0;//u_Ty;
 			vw[5] = 0;//u_Tz;
 			
-			/*
-			for (int i = 0; i<6; i++)
-			{
-				if (disturbances[i] > (randomDisturbances[i]/150)*disturbance_scale && fabs(disturbances[i]) > 0.00001)
-				{
-					disturbances[i] = disturbances[i]/1.2; //Gentle step-down
-					//prior_disturbances[i] = disturbances[i];
-				}
-				else if (disturbances[i] < (randomDisturbances[i]/150)*disturbance_scale && fabs(disturbances[i]) > 0.00001)
-				{
-					disturbances[i] = disturbances[i]*1.2; //Gentle step-up
-				}
-				else
-				{
-					disturbances[i] = (randomDisturbances[i]/150)*disturbance_scale;
-				}
-				/*
-				else if (randomDisturdances[i] != prior_randomDisturbances[i] && disturbances[i] < ((randomDisturdances[i])/150)*disturbance_scale)
-				{
-					disturbances[i] = disturbance[i]*1.2; //Gentle step-up
-				}
-				else
-				{
-					disturbances[i] = (randomDisturbances[i]/150)*disturbance_scale;
-				}
-			}
-			*/
 			for (int j = 0; j<6; j++)
 			{
-				disturbances[j] = ((randomDisturbances[j]/150)*disturbance_scale);///randomDuration;
+				if((copysign(1.0, disturbances[j]) != copysign(1.0, randomDisturbances[j])) && (fabs(disturbances[j]) > 0.001))
+				{
+					disturbances[j] = disturbances[j]/1.2; //Gentle step-down
+				}
+				else if(disturbances[j] < (randomDisturbances[j]*disturbance_scale))
+				{
+					disturbances[j] += fabs((randomDisturbances[j]*disturbance_scale)-disturbances[j])/fabs((randomDisturbances[j]*disturbance_scale)); //Gentle step-up
+				}
+				references[j] = disturbances[j];
 			}
 			
-			randomDuration = randomDuration-1;
+			randomDuration -= 1;
 		}
-		if(force_mode == 4) //2-plane mode
+		if(force_mode == 4) //Resistance mode (Use distrubance as resistance!)
+		{	
+			vw[0] = u_Fx;
+			vw[1] = u_Fy;
+			vw[2] = u_Fz;
+			vw[3] = 0;
+			vw[4] = 0;
+			vw[5] = 0;
+			for (int j = 0; j<6; j++)
+			{
+				references[j] = -fabs(Forces[j]/2)*copysign(1.0, Forces[j]); //Modify /2 into a parameter
+			}
+			
+		}
+		if(force_mode == 5) //2-plane mode
 		{
 			vw[0] = u_Fx;
 			vw[1] = 0;
