@@ -87,7 +87,7 @@ void startFT(pthread_t *forceID)
 		//return -1;
 	}
 	std::cout << "Broadcasting force/torque data!" << std::endl;
-	usleep(200000);
+	usleep(100000);
 }
 
 void stopFT(pthread_t *forceID)
@@ -95,7 +95,7 @@ void stopFT(pthread_t *forceID)
 	initFT = 0;
 	pthread_join(*forceID, NULL);
 	std::cout << "Force thread joined - stopping force/torque data acquisition!" << std::endl;
-	usleep(2000000);
+	usleep(1000000);
 }
 
 void rot_z(double angle, double rot[9])
@@ -227,7 +227,7 @@ void adjustForce(double sq6, double cq6, double outF[3]) //Adjusting for weight 
 	outF[1] = 1+magY*sin(sq6/4+cq6+1)+magY;
 }
 
-void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_time, int force_mode, double f_ref, double t_ref, double buoyancy, double disturbance_scale)
+void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_time, int force_mode, double user_parameters[6], double f_ref, double t_ref, double buoyancy, double disturbance_scale)
 {
 	pthread_t forceID;
 	startFT(&forceID);	
@@ -260,6 +260,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	double u_Tx = 0, u_Ty = 0, u_Tz = 0;
 	
 	double references[6] = {0,0,0,0,0,0}; //ref_Fx, ref_Fy, ref_Fz, ref_Tx, ref_Ty, ref_Tz
+	
 	//=======================================================================
 	double speed[6] = {0,0,0,0,0,0};
 	
@@ -286,7 +287,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	
 	
 	forceTransformation(ref_FT_Frame, ref_TCP_Frame);
-	ref_TCP_Frame[0] = ref_TCP_Frame[0]+f_refx; //f_refx can be used for setting a bouyancy?
+	ref_TCP_Frame[0] = ref_TCP_Frame[0]+f_refx;
 	ref_TCP_Frame[1] = ref_TCP_Frame[1]+f_refy;
 	
 
@@ -463,7 +464,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		}
 		
 		
-		//===============Controller=====================
+		//=============== CONTROLLER =====================
 		//Translational forces - 3DOF
 		integrator_Fx = integrator_Fx + error_Fx;
 		integrator_Fy = integrator_Fy + error_Fy;
@@ -491,7 +492,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		u_Tz = Kp_T*error_Tz + Ki_T*integrator_Tz + Kd_T*derivator_Tz;
 		
 		//FORCE MODES
-		if(force_mode == 1) // Compliance mode
+		if(force_mode == 1) //Compliance mode
 		{
 			vw[0] = u_Fx;
 			vw[1] = u_Fy; 
@@ -509,7 +510,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			vw[4] = 0;//u_Ty;
 			vw[5] = 0;//u_Tz;
 			
-			references[1] = buoyancy; // This generates a constant force on the Y-axis.
+			references[1] = user_parameters[1]; // This generates a constant force on the Y-axis.
 		}
 		if(force_mode == 3) //Random mode
 		{
@@ -543,9 +544,10 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			vw[3] = 0;
 			vw[4] = 0;
 			vw[5] = 0;
+			
 			for (int j = 0; j<6; j++)
 			{
-				references[j] = -fabs(Forces[j]/2)*copysign(1.0, Forces[j]); //Modify /2 into a parameter
+				references[j] = -(fabs(Forces[j]*user_parameters[j]))*copysign(1.0, Forces[j]); //Modify /2 into a parameter
 			}
 			
 		}
@@ -560,7 +562,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		}
 		
 		//FUTURE WORK
-		//Suggested modes: Syrup mode (less agressive controller parameters), 2-plane mode, 1-plane mode, functional reach
+		//Suggested modes: (less agressive controller parameters), 2-plane mode, 1-plane mode, functional reach
 	
 		solveInverseJacobian(q, vw, speed);
 		

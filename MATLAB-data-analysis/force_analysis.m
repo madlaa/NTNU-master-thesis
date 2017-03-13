@@ -91,14 +91,14 @@ grid on;
 % ylabel('Control input')
 % grid on;
 
-% %% Plot force controller errors
-% figure('Name','Force controller errors');
-% plot(elapsTime,errors_F(:,1),elapsTime,errors_F(:,2),elapsTime,errors_F(:,3))
-% legend('Error_{Fx}','Error_{Fy}','Error_{Fz}')
-% title('Force controller errors');
-% xlabel('Elapsed time [s]')
-% ylabel('Errors [N]')
-% grid on;
+%% Plot force controller errors
+figure('Name','Force controller errors');
+plot(elapsTime,errors_F(:,1),elapsTime,errors_F(:,2),elapsTime,errors_F(:,3))
+legend('Error_{Fx}','Error_{Fy}','Error_{Fz}')
+title('Force controller errors');
+xlabel('Elapsed time [s]')
+ylabel('Errors [N]')
+grid on;
 
 % %% Plot torque controller errors
 % figure('Name','Torque controller errors');
