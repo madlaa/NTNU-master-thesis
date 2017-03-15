@@ -401,114 +401,115 @@ void rgbControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int status
 }
   
 
-void introductionProcedure(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int *force_mode, double *user_parameters, double *force_threshold, double *torque_threshold, double *buoyancy, double *disturbance_scale)
+void introductionProcedure(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int *force_mode, double *user_parameters, double *force_threshold, double *torque_threshold)
 {	
 	char ready;
 	
-	while(ready != 'y' || ready != 'Y'){
-	//DEFAULT VALUES
-	*force_mode = 1;
-	//*force_threshold = 0;
-	//*torque_threshold = 0;
-	*disturbance_scale = 0;
-	/*
-	for (int j=0; j<6; j++)
+	while(ready != 'y' || ready != 'Y')
 	{
-		*user_parameters[j] = 0; //Fx, Fy, Fz, Tx, Ty, Tz
-	}*/
-	
-	
-	std::cout << std::endl;
-	std::cout << "====== Robotic rehabilitation of upper-limb after stroke - 'rrulaf' ======" << std::endl;
-	std::cout << std::endl;
-	std::cout << "Currently avaliable force modes are: " << std::endl;
-	std::cout << "1. Compliance mode" << std::endl;
-	std::cout << "2. Buoyancy mode" << std::endl;
-	std::cout << "3. Random mode" << std::endl;
-	std::cout << "4. Resistance mode" << std::endl;
-	std::cout << "5. 2-plane mode" << std::endl;
-	std::cout << std::endl;
-	std::cout << "Please enter the desired force mode. : ";
-	std::cin >> *force_mode;
-	if (*force_mode < 0 || *force_mode > 5)
-	{
-		std::cout << std::endl;
-		std::cout << "ERROR: Invalid input --> value(s) defaults to 1 [compliance mode] ..." << std::endl;
-		std::cout << std::endl;
+		//DEFAULT VALUES
 		*force_mode = 1;
-	}
-	if (*force_mode == 2) //Buoyancy mode
-	{
-		std::cout << "Please enter a desired buoyancy [N] between 0-25 Newtons." << std::endl;
-		std::cin >> user_parameters[1];
-		if (user_parameters[1] < 0 || user_parameters[1] > 25)
-		{
-			std::cout << std::endl;
-			std::cout << "ERROR: Invalid input --> value(s) defaults to 0 ..." << std::endl;
-			std::cout << std::endl;
-			user_parameters[1] = 0;
-		}
-	}
-	if (*force_mode == 3) //Random mode
-	{
-		std::cout << "Please enter a desired disturbance scale between 0-1." << std::endl;
-		std::cin >> *disturbance_scale;
-		if (*disturbance_scale < 0 || *disturbance_scale > 1)
-		{
-			std::cout << std::endl;
-			std::cout << "ERROR: Invalid input --> value(s) defaults to 0 ..." << std::endl;
-			std::cout << std::endl;
-			*disturbance_scale = 0;
-		}
-		//std::cout << "Current setup is: \n Random mode with desired disturbance scale of " << disturbance_scale << std::endl;
-	}
-	if (*force_mode == 4)//Resistance mode
-	{
-		std::cout << "Please enter a desired resistance scale between 0-1 for all axis." << std::endl;
-		std::cout << "Fx [space] Fy [space] Fz [enter] : ";// Tx [space] Ty [space] Tz [enter] : ";
-		std::cin >> user_parameters[0] >> user_parameters[1] >> user_parameters[2]; //>> *user_parameters[3] >> *user_parameters[4] >> *user_parameters[5];
+		//*force_threshold = 0;
+		//*torque_threshold = 0;
 		for (int j=0; j<6; j++)
 		{
-			if (user_parameters[j] < 0 || user_parameters[j] > 1)
+			user_parameters[j] = 0; //Fx, Fy, Fz, Tx, Ty, Tz
+		}
+	
+	
+		std::cout << std::endl;
+		std::cout << "========== ROBOTIC REHABILITATION OF UPPER-LIMB AFTER STROKE - 'rrulaf' ==========" << std::endl;
+		std::cout << std::endl;
+		std::cout << "Currently avaliable force modes are: " << std::endl;
+		std::cout << "1. Compliance mode" << std::endl;
+		std::cout << "2. Buoyancy mode" << std::endl;
+		std::cout << "3. Random mode" << std::endl;
+		std::cout << "4. Resistance mode" << std::endl;
+		std::cout << "5. 2-plane mode" << std::endl;
+		std::cout << std::endl;
+		std::cout << "Please enter the desired force mode. : ";
+		std::cin >> *force_mode;
+		if (*force_mode < 0 || *force_mode > 5)
+		{
+			std::cout << std::endl;
+			std::cout << "ERROR: Invalid input --> restarting ..." << std::endl;
+			std::cout << std::endl;
+			continue;
+		}
+		if (*force_mode == 2) //Buoyancy mode
+		{
+			std::cout << "========== BUOYANCY MODE ==========" << std::endl;
+			std::cout << "Please enter a desired buoyancy [N] between 0-25 Newtons." << std::endl;
+			std::cin >> user_parameters[1];
+			if (user_parameters[1] < 0 || user_parameters[1] > 25)
 			{
 				std::cout << std::endl;
 				std::cout << "ERROR: Invalid input --> value(s) defaults to 0 ..." << std::endl;
 				std::cout << std::endl;
-				user_parameters[j] = 0;
+				user_parameters[1] = 0;
 			}
 		}
-		//std::cout << "Current setup is: \n Resistance mode with desired resistance [N] of " << *user_paramters[0] << *user_paramters[1] << *user_paramters[2] << std::endl;
-	}
-	if (*force_mode == 5) //2-plane mode
-	{
-		std::cout << "Move the robot to the desired staring position. It will be compliant for the next 10 seconds. " << std::endl;
-		forceControl(ur5, rt_msg_cond_, 10, 1, user_parameters, 0, 0, 0, 0);
-		std::cout << "Hopefully, the robot is now in the correct position." << std::endl;
-	}
-	/*
-	std::cout << std::endl;
-	std::cout << "Please enter the desired force threshold [N] and torque threshold [N] in the range 0-10 Newtons: \n  force_threshold [space] torque_threshold [enter]: " ;
-	std::cin >> *force_threshold >> *torque_threshold;
-	if (*force_threshold < 0 || *force_threshold > 10 || *torque_threshold < 0 || *torque_threshold > 10)
-	{
-		std::cout << std::endl;
-		std::cout << "ERROR: Invalid input --> value(s) defaults to 0 ..." << std::endl;
-		std::cout << std::endl;
-		*force_threshold = *torque_threshold = 0;
-	}
-	*/
+		if (*force_mode == 3) //Random mode
+		{
+			std::cout << "========== RANDOM MODE ==========" << std::endl;
+			std::cout << "Please enter a desired disturbance scale between 0-100[%] for all axis." << std::endl;
+			std::cout << "Fx [space] Fy [space] Fz [enter] : ";// Tx [space] Ty [space] Tz [enter] : ";
+			std::cin >> user_parameters[0] >> user_parameters[1] >> user_parameters[2];
+			for (int j=0; j<6; j++)
+			{
+				if (user_parameters[j] < 0 || user_parameters[j] > 100)
+				{
+					std::cout << std::endl;
+					std::cout << "ERROR: Invalid input --> value(s) defaults to 0 ..." << std::endl;
+					std::cout << std::endl;
+					user_parameters[j] = 0;
+				}
+				else
+				{
+					user_parameters[j] /= 100;
+				}
+			}
+		}
+		if (*force_mode == 4) //Resistance mode
+		{
+			std::cout << "========== RESISTANCE MODE ==========" << std::endl;
+			std::cout << "Please enter a desired resistance scale between 0-100[%] for all axis." << std::endl;
+			std::cout << "Fx [space] Fy [space] Fz [enter] : ";// Tx [space] Ty [space] Tz [enter] : ";
+			std::cin >> user_parameters[0] >> user_parameters[1] >> user_parameters[2]; //>> *user_parameters[3] >> *user_parameters[4] >> *user_parameters[5];
+			for (int j=0; j<6; j++)
+			{
+				if (user_parameters[j] < 0 || user_parameters[j] > 100)
+				{
+					std::cout << std::endl;
+					std::cout << "ERROR: Invalid input --> value(s) defaults to 0 ..." << std::endl;
+					std::cout << std::endl;
+					user_parameters[j] = 0;
+				}
+				else
+				{
+					user_parameters[j] /= 100;
+				}
+			}
+			//std::cout << "Current setup is: \n Resistance mode with desired resistance [N] of " << *user_paramters[0] << *user_paramters[1] << *user_paramters[2] << std::endl;
+		}
+		if (*force_mode == 5) //2-plane mode
+		{
+			std::cout << "========== 2-PLANE MODE ==========" << std::endl;
+			std::cout << "Move the robot to the desired staring position. It will be compliant for the next 10 seconds. " << std::endl;
+			forceControl(ur5, rt_msg_cond_, 10, 1, user_parameters, 0, 0);
+			std::cout << "Hopefully, the robot is now in the correct position." << std::endl;
+		}
 	
-	std::cout << "Would you like to keep the current setup [y/n]?" << std::endl;
-	std::cin >> ready;
-	//usleep(1000000);
-	if (ready == 'n' || ready == 'N')
-	{
-		continue;
-	}
-	else 
-	{
-		break;
-	}
+		std::cout << "Would you like to keep the current setup [y/n]?" << std::endl;
+		std::cin >> ready;
+		if (ready == 'n' || ready == 'N')
+		{
+			continue;
+		}
+		else 
+		{
+			break;
+		}
 	}
 }
 
@@ -525,6 +526,7 @@ int main()
 	std::mutex msg_lock;
 	std::unique_lock<std::mutex> locker(msg_lock);
 	std::cout << "Waiting for data ..." << std::endl;
+	
 	while (!ur5.rt_interface_->robot_state_->getDataPublished())
 	{
 	rt_msg_cond_.wait(locker);
@@ -541,20 +543,20 @@ int main()
 	*/
 	
 	// Starting position with good range of motion and minimal self-collision 
-	double qStart[6] = {0.0078, -2.5012, -1.5813, -2.2244, -1.8349, 0};
+	double qStart[6] = {0.0078, -2.5012, -1.5813, -2.2244, -1.8349, 0.436332}; //205[deg]= 3.577924
 	//double qTest[6] = {-0.3552, -2.2918, -2.3594, -1.6499, -4.3131, 0.5255};
 	char operator_ready = 'N';
 	while(operator_ready != 'y' || operator_ready != 'Y')
 	{
 		std::cout << "======================== WARNING! ========================" << std::endl;
-		std::cout << "The robot will now move to a starting position. Make sure the working area around the robot clear. \n Is the area clear? [y/n]? ";
+		std::cout << "The robot will now move to a starting position. Make sure the working area around the robot clear. \n Is the area clear [y/n]? ";
 		std::cin >> operator_ready;
 		if (operator_ready == 'y' || operator_ready == 'Y')
 		{
 			// MOVE TO STARING POINT
 			std::cout << "======================== POSITION CONTROL ACTIVE ========================" << std::endl;
 			std::cout << "Moving to staring location. " << std::endl;
-			moveSimpleJointDirect(&ur5, &rt_msg_cond_, qStart, 1, 1);
+			moveSimpleJointDirect(&ur5, &rt_msg_cond_, qStart, 1, 1); //Maybe slow down the movement?
 			//moveSimpleJointDirect(&ur5, &rt_msg_cond_, qTest, 1, 1);
 			//moveSimpleJoint(&ur5, &rt_msg_cond_, qStart, 0, 0.2, 0.2);
 			break;
@@ -564,20 +566,18 @@ int main()
 	int force_mode = 4;
 	double force_threshold = 0;
 	double torque_threshold = 0;
-	double buoyancy = 0;
-	double disturbance_scale = 0;
 	double user_parameters[6] = {0,0,0,0,0,0}; //Fx, Fy, Fz, Tx, Ty, Tz
 	//double *p_user_parameters = user_parameters;
 	
-	introductionProcedure(&ur5, &rt_msg_cond_, &force_mode, user_parameters, &force_threshold, &torque_threshold, &buoyancy, &disturbance_scale);
+	introductionProcedure(&ur5, &rt_msg_cond_, &force_mode, user_parameters, &force_threshold, &torque_threshold);
 	
 	std::cout << "Initializing force control. \n" << std::endl;
 	pthread_t forceID; //this is done inside force.cpp
 	//startFT(&forceID);
 
-	forceControl(&ur5, &rt_msg_cond_, 200, force_mode, user_parameters, force_threshold, torque_threshold, buoyancy, disturbance_scale);
+	forceControl(&ur5, &rt_msg_cond_, 200, force_mode, user_parameters, force_threshold, torque_threshold);
 	
-	usleep(10000);
+	usleep(1000);
 	
 	stopFT(&forceID);
 	std::cout << "Shutting down force control. \n";
