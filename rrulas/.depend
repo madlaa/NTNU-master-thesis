@@ -1,0 +1,6 @@
+ur_kin.o: ../kinematics/ur_kin.h
+do_output.o: ../ur_modern_driver-master/include/do_output.h
+ur_kin.o: ../kinematics/ur_kin.cpp ../kinematics/ur_kin.h \
+ ../kinematics/ikfast.h
+do_output.o: ../ur_modern_driver-master/src/do_output.cpp \
+ ../ur_modern_driver-master/src/../include/do_output.h

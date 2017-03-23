@@ -315,7 +315,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	
 	//Doublecheck PID controller tuning
 	Kp = 0.005;//0.005; //Original: -0.005 // Tuned: -0.008 or 0.005
-	Ki = 0.0003;//0.0002; //Original: -0.000025 //Tuned: -0.00085 or -0.0003
+	Ki = 0.0002;//0.0002; //Original: -0.000025 //Tuned: -0.00085 or -0.0003
 	Kd = 0.0002;//0.0002;//0.000045; //Original: -0.000025 //Tuned: -0.00045
 	
 	Kp_T = 0.03;//0.3; //Original: -0.005;
