@@ -565,7 +565,7 @@ int main()
 	
 	introductionProcedure(&ur5, &rt_msg_cond_, &force_mode, user_parameters, &force_threshold, &torque_threshold);
 	
-	std::cout << "Initializing force control. \n" << std::endl;
+	std::cout << "Initializing force control... \n" << std::endl;
 	pthread_t forceID; //this is done inside force.cpp
 	//startFT(&forceID);
 

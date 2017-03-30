@@ -82,7 +82,7 @@ grid on;
 % xlabel('Elapsed time [s]')
 % ylabel('Control input')
 % grid on;
-% 
+
 % %% Plot torque control inputs
 % figure('Name','Torque control inputs');
 % plot(elapsTime,u_T(:,1),elapsTime,u_T(:,2),elapsTime,u_T(:,3))
@@ -110,17 +110,30 @@ grid on;
 % ylabel('Errors [N]')
 % grid on;
 
-%% Plot tool frame bias vs. force frame bias
-figure('Name','tool frame bias vs. force frame bias');
-plot(elapsTime,biasForce(:,1), '--o', elapsTime,biasForce(:,2), '--', elapsTime,biasForce(:,3)) 
-hold on;
-plot(elapsTime,biasFT(:,1), '--o', elapsTime,biasFT(:,2), '--', elapsTime,biasFT(:,3)) 
-hold off;
-legend('biasForce_{Fx}','biasForce_{Fy}','biasForce_{Fz}', 'biasFT_{Fx}','biasFT_{Fy}','biasFT_{Fz}')
-title('tool frame bias vs. force frame bias');
-xlabel('Elapsed time [s]')
-ylabel('Bias [N]')
-grid on;
+% %% Plot tool frame bias vs. force frame bias
+% figure('Name','tool frame bias vs. force frame bias');
+% plot(elapsTime,biasForce(:,1), '--o', elapsTime,biasForce(:,2), '--', elapsTime,biasForce(:,3)) 
+% hold on;
+% plot(elapsTime,biasFT(:,1), '--o', elapsTime,biasFT(:,2), '--', elapsTime,biasFT(:,3)) 
+% hold off;
+% legend('biasForce_{Fx}','biasForce_{Fy}','biasForce_{Fz}', 'biasFT_{Fx}','biasFT_{Fy}','biasFT_{Fz}')
+% title('tool frame bias vs. force frame bias');
+% xlabel('Elapsed time [s]')
+% ylabel('Bias [N]')
+% grid on;
+
+% %% Plot bias_tool_TF vs. forces
+% figure('Name','tool frame bias vs. force frame bias');
+% plot(elapsTime,biasForce(:,1), '--o', elapsTime,biasForce(:,2), '--', elapsTime,biasForce(:,3)) 
+% hold on;
+% plot(elapsTime,rawFTdata(:,1), '--o',elapsTime,rawFTdata(:,2), '--',elapsTime,rawFTdata(:,3)) 
+% hold off;
+% legend('biasForce_{Fx}','biasForce_{Fy}','biasForce_{Fz}', 'raw_{Fx}','raw_{Fy}','raw_{Fz}')
+% title('tool frame bias vs. force frame bias');
+% xlabel('Elapsed time [s]')
+% ylabel('Bias [N]')
+% grid on;
+
 
 % %% Plot force frame bias
 % figure('Name','Force frame bias (biasFT)');
