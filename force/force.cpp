@@ -4,6 +4,7 @@
 #include "ufwdkin_c.c"
 
 int initFT = 1;
+int iterationTime = 0.011;//about 90 Hz//0.008; // 0.008 [ms] ~ 125 Hz
 int forceSleepTime = 10000; //usleep(10000) ~ 90 Hz --> run a bit faster than the fastest human reaction time -- currently involuntary muscle contractions at 24ms ~ 41,6 Hz
 //Fastest possible hardware update rate for the UR5 is set at 8ms ~ 125 Hz equivalent to usleep(8000)
 double rawFTdata[6];
@@ -261,9 +262,9 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	int iter = run_time/0.008;
 	
 	//Doublecheck PID controller tuning
-	Kp = 0.005;//0.005; //Original: -0.005 // Tuned: -0.008 or 0.005
-	Ki = 0.0003;//0.0002; //Original: -0.000025 //Tuned: -0.00085 or -0.0003
-	Kd = 0.0002;//0.0002;//0.000045; //Original: -0.000025 //Tuned: -0.00045
+	Kp = 0.005;//0.007;//
+	Ki = 0.0003;//0.0003;//
+	Kd = 0.0002;//0.0001;//
 	
 	Kp_T = 0.03;//0.3; //Original: -0.005;
 	Ki_T = 0.005;//0.003; //Original: -0.000025;
@@ -334,7 +335,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		theta = atan2(gsl_vector_get(O,1), gsl_vector_get(O,0));
 		radius_current = sqrt(pow(gsl_vector_get(O,0), 2.0)+pow(gsl_vector_get(O,1), 2.0));
    		
-   		error_Fx = error_Fx = error_Fx = 0;
+   		error_Fx = error_Fy = error_Fz = 0;
    		//FORCE ERROR UPDATES
    		if(fabs(Forces[0]) < 1 && fabs(Forces[1]) < 1 && fabs(Forces[2]) < 1)
    		{
@@ -409,6 +410,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	   		}
 		}
 		
+		error_Tx = error_Ty = error_Tz = 0;
 		//TORQUE ERROR UPDATES
 		if(fabs(Torques[0]) < 0.5 && fabs(Torques[1]) < 0.5 && fabs(Torques[2]) < 0.5)
 		{
@@ -477,16 +479,16 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			randomDuration = rand() % 500 + 250; //Duration between 2-4 seconds
 		}
 		
-		
+		//error_Fx, error_Fy, error_Fz, error_Tx, error_Ty, error_Tz 
 		//=============== CONTROLLER =====================
 		//Translational forces - 3DOF
-		integrator_Fx = integrator_Fx + error_Fx;
-		integrator_Fy = integrator_Fy + error_Fy;
-		integrator_Fz = integrator_Fz + error_Fz;
+		integrator_Fx = integrator_Fx + error_Fx;//*iterationTime;
+		integrator_Fy = integrator_Fy + error_Fy;//*iterationTime;
+		integrator_Fz = integrator_Fz + error_Fz;//*iterationTime;
 		
-		derivator_Fx = error_Fx - prior_error_Fx;
-		derivator_Fy = error_Fy - prior_error_Fy;
-		derivator_Fz = error_Fz - prior_error_Fz;
+		derivator_Fx = error_Fx - prior_error_Fx;//(error_Fx - prior_error_Fx)/iterationTime;//
+		derivator_Fy = error_Fy - prior_error_Fy;//(error_Fy - prior_error_Fy)/iterationTime;//
+		derivator_Fz = error_Fz - prior_error_Fz;//(error_Fz - prior_error_Fz)/iterationTime;//
 		
 		u_Fx = Kp*error_Fx + Ki*integrator_Fx + Kd*derivator_Fx;
 		u_Fy = Kp*error_Fy + Ki*integrator_Fy + Kd*derivator_Fy;
@@ -506,7 +508,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		u_Tz = Kp_T*error_Tz + Ki_T*integrator_Tz + Kd_T*derivator_Tz;
 		
 		//SAFETY MECHANISM 
-		if(fabs(u_Fx) > 5 || fabs(u_Fy) > 5 || fabs(u_Fz) > 5) //Ensures passitivity in system
+		if(fabs(u_Fx) > 5 || fabs(u_Fy) > 5 || fabs(u_Fz) > 5) //NB! Replace with original value of 5
 		{
 			std::cout << "============================= STOPPING! ============================" << std::endl;
 			ur5->halt();
@@ -523,9 +525,9 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		}
 		
 		//Clear all referances
-		for (int g = 0; g<6; g++)
+		for (int j = 0; j<6; j++)
 		{
-			references[g] = 0;
+			references[j] = 0;
 		}
 		
 		//FORCE MODES
@@ -534,9 +536,9 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			vw[0] = u_Fx;
 			vw[1] = u_Fy; 
 			vw[2] = u_Fz; 
-			vw[3] = u_Tx;
-			vw[4] = u_Ty;
-			vw[5] = u_Tz;
+			vw[3] = 0;//u_Tx;
+			vw[4] = 0;//u_Ty;
+			vw[5] = 0;//u_Tz;
 		}
 		if(force_mode == 2) //Buoyancy mode
 		{
@@ -551,9 +553,10 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			double buoyancy_vector_TF[3]; 
 			vector_trans_base_tool(q, buoyancy_vector_WF, buoyancy_vector_TF);
 			
-			references[0] = buoyancy_vector_TF[0];
-			references[1] = buoyancy_vector_TF[1];
-			references[2] = buoyancy_vector_TF[2];
+			for (int j = 0; j<3; j++)
+			{
+				references[j] = buoyancy_vector_TF[j];
+			}
 		}
 		if(force_mode == 3) //Random mode
 		{
@@ -591,7 +594,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			for (int j = 0; j<6; j++)
 			{
 				references[j] = -(fabs(Forces[j]*user_parameters[j]))*copysign(1.0, Forces[j]);
-				if (user_parameters[j] == 1)
+				if (user_parameters[j] == 100)
 				{
 					vw[j] = 0;
 				}
@@ -638,4 +641,3 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	
 	forcelog.close();
 }
-
