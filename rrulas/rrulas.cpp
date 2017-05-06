@@ -495,7 +495,7 @@ void introductionProcedure(UrDriver *ur5, std::condition_variable *rt_msg_cond_,
 		{
 			std::cout << "========== 2-PLANE MODE ==========" << std::endl;
 			std::cout << "Move the robot to the desired staring position. It will be compliant for the next 10 seconds. " << std::endl;
-			forceControl(ur5, rt_msg_cond_, 10, 1, user_parameters, 0, 0);
+			//forceControl(ur5, rt_msg_cond_, 10, 1, user_parameters, 0, 0);
 			std::cout << "Hopefully, the robot is now in the correct position." << std::endl;
 		}
 	
@@ -538,7 +538,7 @@ int main()
 	*/
 	
 	// Starting position with good range of motion and minimal self-collision 
-	double qStart[6] = {0.0078, -2.5012, -1.5813, -2.2244, -1.8349, 0.436332}; //205[deg] = 3.577924, 25[deg] = 0.436332
+	double qStart[6] = {-0.6178, -2.5028, -1.5813, -2.2242, -1.8354, -1.1373};//{0.0078, -2.5012, -1.5813, -2.2244, -1.8349, -1.135}; //205[deg] = 3.577924, 25[deg] = 0.436332
 	//double qTest[6] = {-0.3552, -2.2918, -2.3594, -1.6499, -4.3131, 0.5255};
 	char user_ready;
 	while(user_ready != 'y' || user_ready != 'Y')
@@ -558,7 +558,7 @@ int main()
 		}
 	}
 	// FORCE CONTROL
-	int force_mode = 4;
+	int force_mode = 1;
 	double force_threshold = 0;
 	double torque_threshold = 0;
 	double user_parameters[6] = {0,0,0,0,0,0}; //Fx, Fy, Fz, Tx, Ty, Tz
@@ -568,7 +568,6 @@ int main()
 	std::cout << "Initializing force control... \n" << std::endl;
 	pthread_t forceID; //this is done inside force.cpp
 	//startFT(&forceID);
-
 	forceControl(&ur5, &rt_msg_cond_, 200, force_mode, user_parameters, force_threshold, torque_threshold);
 	
 	usleep(1000);

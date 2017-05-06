@@ -1,0 +1,36 @@
+Notes to PID testing:
+Testing of PID controller with all five different modes. The manipulator is initiated at the far end of the table. During constant pertubation the manipulator will drift gently to the right. This is probably due to a slight missalignment in the mounting of the F/T sensor. Instead of changing this, it is velcomed as it gives an oppertunity to see what happens when the manipulator moves outside the allowed workspace.
+
+For this test a 00cmx00cmx00cm block of steel is used to pertubate the system. The manipulator is rotated such that the aluminum ring is parralell with the horisontal plane. The leather wristband is tied to the ring to minimize its interference. The steel block is placed ontop of the aluminum ring and removed at the start and end of each test.
+
+Starting pose: double qStart[6] = {-0.6178, -2.5028, -1.5813, -2.2242, -1.8354, -1.1373};
+
+1. Compliance mode.
+Expectations: 
+Moving downwards and slightly to the right(positive base joint rotation). Stopping before hitting table and/or outer perimiter.
+Observations:
+Behaves as expected.
+
+2. Buoyancy mode (10N)
+Expectations: 
+Moving upwards and slightly to the right(positive base joint rotation). Stopping before hitting upper height limit and/or outer perimiter.
+Observations:
+Hits roof as expected.
+
+3. Random mode (50 50 50)%
+Expectations: 
+Random movements while moving upwards and slightly to the right(positive base joint rotation). Stopping before hitting table and/or outer perimiter.
+Observations:
+Movement to the right is amplified by random pertubation.
+
+4. Resistance mode (50 50 50)%
+Expectations: 
+Slow movements upwards and slightly to the right(positive base joint rotation). Stopping before hitting table and/or outer perimiter.
+Observations: 
+Movements is definitivly slower.
+
+5. 2-plane mode
+Expectations: 
+No movements upwards but slightly to the right(positive base joint rotation). Stopping before hitting outer perimiter.
+Observations:
+Moves upwards and to the right(positive base joint rotation). Maybe it touches the innen parameter. Should not move in horisontal direction, but offset make movement possible.

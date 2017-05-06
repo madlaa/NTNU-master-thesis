@@ -5,8 +5,9 @@
 
 int initFT = 1;
 int iterationTime = 0.011;//about 90 Hz//0.008; // 0.008 [ms] ~ 125 Hz
-int forceSleepTime = 10000; //usleep(10000) ~ 90 Hz --> run a bit faster than the fastest human reaction time -- currently involuntary muscle contractions at 24ms ~ 41,6 Hz
+int forceSleepTime = 8000; 
 //Fastest possible hardware update rate for the UR5 is set at 8ms ~ 125 Hz equivalent to usleep(8000)
+//usleep(10000) ~ 90 Hz --> run a bit faster than the fastest human reaction time -- currently involuntary muscle contractions at 24ms ~ 41,6 Hz
 double rawFTdata[6];
 double biasTF[3]; // Tool frame (or TCP frame)
 
@@ -75,7 +76,6 @@ void *getFTData(void *arg)
 	
 		rawFTdata[0] = Fx; rawFTdata[1] = Fy; rawFTdata[2] = Fz; rawFTdata[3] = Tx; rawFTdata[4] = Ty; rawFTdata[5] = Tz;
 		usleep(3800); // 4000 microseconds ~ 250 Hz is current FT broadcast frequency
-		//usleep830 ~ 1200 Hz --> run a bit faster than FT broadcast frequency -- currently 1000 Hz
 	}
 }
 
@@ -250,25 +250,25 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	double startTime = ur5->rt_interface_->robot_state_->getTime();
 	std::vector<double> sq = ur5->rt_interface_->robot_state_->getQActual();
 	vector_trans_base_tool(sq, bias_tool_WF, bias_tool_TF);
-	
+	/*
 	for (int i=0; i<3; i++)
 	{
 		bias_mounting[i] = fabs(rawFTdata[i]) + bias_tool_TF[i];
 		std::cout << "bias_mounting[" << i << "] = " << bias_mounting[i] << std::endl;
 	}
-	
+	*/
 	
 	int i = 0; 
 	int iter = run_time/0.008;
 	
 	//Doublecheck PID controller tuning
-	Kp = 0.005;//0.007;//
-	Ki = 0.0003;//0.0003;//
-	Kd = 0.0002;//0.0001;//
+	Kp = 0.005;//Optumally tuned but unstable: Kp = 0.007;
+	Ki = 0.0003;//Optumally tuned but unstable: Kp = 0.0003;
+	Kd = 0.0002;//Optumally tuned but unstable: Kp = 0.0001;
 	
-	Kp_T = 0.03;//0.3; //Original: -0.005;
-	Ki_T = 0.005;//0.003; //Original: -0.000025;
-	Kd_T = 0.0005;//0.000045;
+	Kp_T = 0.03;//Optumally tuned but unstable: Kp = 0.03;
+	Ki_T = 0.005;//Optumally tuned but unstable: Kp = 0.005;
+	Kd_T = 0.0005;//Optumally tuned but unstable: Kp = 0.0005;
 	
 	gsl_matrix *R = gsl_matrix_calloc(3,3);
 	gsl_vector *O = gsl_vector_alloc(3);
@@ -378,9 +378,9 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	   			correction_vector_TF[0] = correction_vector_TF[1] = correction_vector_TF[2] = 0;
 	   			vector_trans_base_tool(q, correction_vector_WF, correction_vector_TF);
 	   			
-	   			error_Fx += correction_vector_TF[0]*fabs(radius_current-radius_min)*correction_vector_scale;
-	   			error_Fy += correction_vector_TF[1]*fabs(radius_current-radius_min)*correction_vector_scale;
-	   			error_Fz += correction_vector_TF[2]*fabs(radius_current-radius_min)*correction_vector_scale;
+	   			error_Fx += correction_vector_TF[0]*fabs(radius_current-radius_min)*correction_vector_scale*1.5;
+	   			error_Fy += correction_vector_TF[1]*fabs(radius_current-radius_min)*correction_vector_scale*1.5;
+	   			error_Fz += correction_vector_TF[2]*fabs(radius_current-radius_min)*correction_vector_scale*1.5;
 			}
 	   		if(gsl_vector_get(O,2) > height_max)
 	   		{
@@ -536,9 +536,9 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			vw[0] = u_Fx;
 			vw[1] = u_Fy; 
 			vw[2] = u_Fz; 
-			vw[3] = 0;//u_Tx;
-			vw[4] = 0;//u_Ty;
-			vw[5] = 0;//u_Tz;
+			vw[3] = u_Tx;
+			vw[4] = u_Ty;
+			vw[5] = u_Tz;
 		}
 		if(force_mode == 2) //Buoyancy mode
 		{
@@ -603,8 +603,8 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		}
 		if(force_mode == 5) //2-plane mode (covered by resistance mode?)
 		{
-			vw[0] = u_Fx;
-			vw[1] = 0;
+			vw[0] = 0;//u_Fx;
+			vw[1] = u_Fy;
 			vw[2] = u_Fz;
 			vw[3] = 0;
 			vw[4] = 0;
@@ -628,7 +628,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		prior_error_Tz = error_Tz;
 		
 		
-		forcelog << elapsTime << " " << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " " << q[4] << " " << q[5] << " " << rawFTdata[0] << " " << rawFTdata[1] << " " << rawFTdata[2] << " " << rawFTdata[3] << " " << rawFTdata[4] << " " << rawFTdata[5] << " " << Forces[0] << " " << Forces[1] << " " << Forces[2] << " " << Torques[0] << " " << Torques[1] << " " << Torques[2] << " " << error_Fx << " " << error_Fy << " " << error_Fz << " " << error_Tx << " " << error_Ty << " " << error_Tz << " " << u_Fx << " " << u_Fy << " " << u_Fz << " " << u_Tx << " " << u_Ty << " " << u_Tz << " " << biasForce[0] << " " << biasForce[1] << " " << biasForce[2] << " "  << bias_tool_TF[0] << " " << bias_tool_TF[1] << " " << bias_tool_TF[2] << " " << "\n";
+		forcelog << elapsTime << " " << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " " << q[4] << " " << q[5] << " " << rawFTdata[0] << " " << rawFTdata[1] << " " << rawFTdata[2] << " " << rawFTdata[3] << " " << rawFTdata[4] << " " << rawFTdata[5] << " " << Forces[0] << " " << Forces[1] << " " << Forces[2] << " " << Torques[0] << " " << Torques[1] << " " << Torques[2] << " " << error_Fx << " " << error_Fy << " " << error_Fz << " " << error_Tx << " " << error_Ty << " " << error_Tz << " " << u_Fx << " " << u_Fy << " " << u_Fz << " " << u_Tx << " " << u_Ty << " " << u_Tz << " " << biasForce[0] << " " << biasForce[1] << " " << biasForce[2] << " "  << bias_tool_TF[0] << " " << bias_tool_TF[1] << " " << bias_tool_TF[2] << " " << gsl_vector_get(O,0) << " " << gsl_vector_get(O,1) << " " << gsl_vector_get(O,2) << " " << "\n";
 		
 		
 		i = i+1;
