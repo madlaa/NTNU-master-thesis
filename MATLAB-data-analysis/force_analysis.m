@@ -6,7 +6,7 @@ close all;
 clear all;
 %% Load data from file
 fileID = fopen('data/logs/forcelog');
-dim = 46; %time(1), q(6), s(6), etc..
+dim = 58; %time(1), q(6), s(6), etc..
 data_format = repmat('%f ', 1, dim);
 raw_data = textscan(fileID, data_format); %Remember to delete any incomplete log entries in the final row.
 [N, M] = size(raw_data{1,1});
@@ -27,7 +27,20 @@ u_F = data(:, 32:34);
 u_T = data(:, 35:37);
 biasFT = data(:, 38:40);
 biasForce = data(:, 41:43);
-bias_tool_TF = data(:, 44:46);
+end_effector_coordiante_cartesian = data(:, 44:46);
+random_disturbances = data(:, 47:49);
+buoyancy_vector = data(:, 50:52);
+correlation_radius_vector = data(:, 53:55);
+correlation_height_vector = data(:, 56:58);
+
+% %% Plot end-effector coordinates (cartesian)
+% figure('Name','End-effector coordinates (cartesian)');
+% plot(elapsTime,end_effector_coordiante_cartesian(:,1),elapsTime,end_effector_coordiante_cartesian(:,2),elapsTime,end_effector_coordiante_cartesian(:,3))
+% legend('X','Y','Z')
+% title('End-effector coordinates (cartesian)');
+% xlabel('Elapsed time [s]')
+% ylabel('Cartesian coordinate values')
+% grid on;
 
 % %% Plot joint speeds
 % figure('Name','Joint speeds');
@@ -56,22 +69,38 @@ bias_tool_TF = data(:, 44:46);
 % ylabel('Raw sensor inputs [N]')
 % grid on;
 
-%% Plot force sensor input
+% Plot force sensor input
 figure('Name','Force sensor input');
-plot(elapsTime,Forces(:,1),elapsTime,Forces(:,2),elapsTime,Forces(:,3))
-legend('F_x','F_y','F_z')
+plot(elapsTime,-Forces(:,2), elapsTime, ones(size(Forces))*10)
+legend('F_y', 'referance')
 title('Force sensor input');
 xlabel('Elapsed time [s]')
 ylabel('Force sensor input [N]')
 grid on;
 
+%% Plot carteesian coordinates
+figure('Name','Carteesian coordinates');
+t = 0:pi/50:5*pi;
+st = sin(t)/20;
+ct = cos(t)/20;
+plot3(end_effector_coordiante_cartesian(:,1), end_effector_coordiante_cartesian(:,2), end_effector_coordiante_cartesian(:,3))
+hold on;
+plot3(st,ct,t)
+hold off;
+%legend('X', 'Y', 'Z')
+title('Carteesian coordinates');
+xlabel('X-axis')
+ylabel('Y-axis')
+zlabel('Z-axis')
+grid on;
+
 % %% Plot torque sensor input
 % figure('Name','Torque sensor input');
-% plot(elapsTime,Torques(:,1),elapsTime,Torques(:,2),elapsTime,Torques(:,3))
-% legend('T_x','T_y','T_z')
+% plot(elapsTime,Torques(:,3), elapsTime, ones(size(Torques))*1)
+% legend('T_z')
 % title('Torque sensor input');
 % xlabel('Elapsed time [s]')
-% ylabel('Torque sensor input [Nm]')
+% ylabel('Torque [Nm]')
 % grid on;
 
 % %% Plot force control inputs
