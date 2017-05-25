@@ -194,7 +194,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	std::cout << "Force control initiated - starting data logging ..." << std::endl;
 	std::ofstream forcelog;
 	forcelog.open("../data/logs/forcelog", std::ofstream::out);
-	double iteration_time = 0.008;//0.008 [ms] ~ 125 Hz || 0.011 [ms] ~  90 Hz
+	//double iteration_time = 0.008;//0.008 [ms] ~ 125 Hz || 0.011 [ms] ~  90 Hz
 	
 	//Control system for translation forces
 	double integrator_Fx = 0, integrator_Fy = 0, integrator_Fz = 0;
@@ -440,17 +440,19 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	   		error_Tz = Torques[2];
 	   		
 	   		//SAFETY MECHANISM
+	   		/*
 	   		if(fabs(q[3]) > fabs(sq[3])+angle_max)
 			{
-				error_Tx += copysign((fabs(q[3])-(fabs(sq[3])+angle_max))*10, -q[3]);
+				error_Tx += copysign((fabs(q[3])-(fabs(sq[3])+angle_max))*2, -q[3]);
 			}
 			if(fabs(q[4]) > fabs(sq[4])+angle_max)
 			{
-				error_Ty += copysign((fabs(q[4])-(fabs(sq[4])+angle_max))*10, -q[4]);
+				error_Ty += copysign((fabs(q[4])-(fabs(sq[4])+angle_max))*2, -q[4]);
 			}
+			*/
 			if(fabs(q[5]) > fabs(sq[5])+angle_max)
 			{
-				error_Tz += copysign((fabs(q[5])-(fabs(sq[5])+angle_max))*10, -q[5]);
+				error_Tz += copysign((fabs(q[5])-(fabs(sq[5])+angle_max))*3, -q[5]);
 			}
 		}
 
@@ -464,7 +466,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			break;
 		}
 		
-		if(fabs(error_Tx) > 25 || fabs(error_Ty) > 25 || fabs(error_Tz) > 25)
+		if(fabs(error_Tx) > 8 || fabs(error_Ty) > 8 || fabs(error_Tz) > 8)
 		{
 			std::cout << "============================= STOPPING! ============================" << std::endl;
 			ur5->halt();
@@ -632,6 +634,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		solveInverseJacobian(q, vw, speed);
 		
 		ur5->rt_interface_->robot_state_->setDataPublished();
+		//ur5->setSpeed(0, 0, 0, speed[3], speed[4], speed[5], 100);
 		ur5->setSpeed(speed[0], speed[1], speed[2], speed[3], speed[4], speed[5], 100);
 		
 		prior_error_Fx = error_Fx; 
@@ -642,8 +645,9 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		prior_error_Ty = error_Ty;
 		prior_error_Tz = error_Tz;
 		
+		
 		//DATA LOGGING
-		forcelog << elapsTime << " " << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " " << q[4] << " " << q[5] << " " << rawFTdata[0] << " " << rawFTdata[1] << " " << rawFTdata[2] << " " << rawFTdata[3] << " " << rawFTdata[4] << " " << rawFTdata[5] << " " << Forces[0] << " " << Forces[1] << " " << Forces[2] << " " << Torques[0] << " " << Torques[1] << " " << Torques[2] << " " << error_Fx << " " << error_Fy << " " << error_Fz << " " << error_Tx << " " << error_Ty << " " << error_Tz << " " << u_Fx << " " << u_Fy << " " << u_Fz << " " << u_Tx << " " << u_Ty << " " << u_Tz << " " << biasForce[0] << " " << biasForce[1] << " " << biasForce[2] << " "  << bias_tool_TF[0] << " " << bias_tool_TF[1] << " " << bias_tool_TF[2] << " " << gsl_vector_get(O,0) << " " << gsl_vector_get(O,1) << " " << gsl_vector_get(O,2) << " " << disturbances[0] << " " << disturbances[1] << " " << disturbances[2] << " " << buoyancy_vector_TF[0] << " " << buoyancy_vector_TF[1] << " " << buoyancy_vector_TF[2] << " " << correction_vector_radius_datalog[0] << " " << correction_vector_radius_datalog[1] << " " << correction_vector_radius_datalog[2] << " " << correction_vector_height_datalog[0] << " "  << correction_vector_height_datalog[1] << " " << correction_vector_height_datalog[2] << " " << "\n";
+		forcelog << elapsTime << " " << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " " << q[4] << " " << q[5] << " " << rawFTdata[0] << " " << rawFTdata[1] << " " << rawFTdata[2] << " " << rawFTdata[3] << " " << rawFTdata[4] << " " << rawFTdata[5] << " " << Forces[0] << " " << Forces[1] << " " << Forces[2] << " " << Torques[0] << " " << Torques[1] << " " << Torques[2] << " " << error_Fx << " " << error_Fy << " " << error_Fz << " " << error_Tx << " " << error_Ty << " " << error_Tz << " " << u_Fx << " " << u_Fy << " " << u_Fz << " " << u_Tx << " " << u_Ty << " " << u_Tz << " " << biasForce[0] << " " << biasForce[1] << " " << biasForce[2] << " "  << bias_tool_TF[0] << " " << bias_tool_TF[1] << " " << bias_tool_TF[2] << " " << gsl_vector_get(O,0) << " " << gsl_vector_get(O,1) << " " << gsl_vector_get(O,2) << " " << disturbances[0] << " " << disturbances[1] << " " << disturbances[2] << " " << buoyancy_vector_TF[0] << " " << buoyancy_vector_TF[1] << " " << buoyancy_vector_TF[2] << " " << correction_vector_radius_datalog[0] << " " << correction_vector_radius_datalog[1] << " " << correction_vector_radius_datalog[2] << " " << correction_vector_height_datalog[0] << " " << correction_vector_height_datalog[1] << " " << correction_vector_height_datalog[2] << " " << gsl_matrix_get(R,0,0) << " " << gsl_matrix_get(R,0,1) << " " << gsl_matrix_get(R,0,2) << " " << gsl_matrix_get(R,1,0) << " " << gsl_matrix_get(R,1,1) << " " << gsl_matrix_get(R,1,2) << " " << gsl_matrix_get(R,2,0) << " " << gsl_matrix_get(R,2,1) << " " << gsl_matrix_get(R,2,2) << " " << "\n";
 		
 		
 		i = i+1;
