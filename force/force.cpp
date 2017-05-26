@@ -377,9 +377,9 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	   			correction_vector_TF[0] = correction_vector_TF[1] = correction_vector_TF[2] = 0;
 	   			vector_trans_base_tool(q, correction_vector_WF, correction_vector_TF);
 	   			
-	   			correction_vector_radius_datalog[0] = correction_vector_TF[0]*fabs(radius_current-radius_min)*correction_vector_scale*1.5;
-	   			correction_vector_radius_datalog[1] = correction_vector_TF[1]*fabs(radius_current-radius_min)*correction_vector_scale*1.5;
-	   			correction_vector_radius_datalog[2] = correction_vector_TF[2]*fabs(radius_current-radius_min)*correction_vector_scale*1.5;
+	   			correction_vector_radius_datalog[0] = correction_vector_TF[0]*fabs(radius_current-radius_min)*correction_vector_scale*2;
+	   			correction_vector_radius_datalog[1] = correction_vector_TF[1]*fabs(radius_current-radius_min)*correction_vector_scale*2;
+	   			correction_vector_radius_datalog[2] = correction_vector_TF[2]*fabs(radius_current-radius_min)*correction_vector_scale*2;
 	   			
 	   			error_Fx += correction_vector_radius_datalog[0];
 	   			error_Fy += correction_vector_radius_datalog[1];
@@ -634,7 +634,6 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		solveInverseJacobian(q, vw, speed);
 		
 		ur5->rt_interface_->robot_state_->setDataPublished();
-		//ur5->setSpeed(0, 0, 0, speed[3], speed[4], speed[5], 100);
 		ur5->setSpeed(speed[0], speed[1], speed[2], speed[3], speed[4], speed[5], 100);
 		
 		prior_error_Fx = error_Fx; 

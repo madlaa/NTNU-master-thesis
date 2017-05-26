@@ -235,16 +235,17 @@ void introductionProcedure(UrDriver *ur5, std::condition_variable *rt_msg_cond_,
 		{
 			std::cout << "========== 2-PLANE MODE ==========" << std::endl;
 			std::cout << "Move the robot to the desired staring position. It will be compliant for the next 10 seconds. " << std::endl;
-			forceControl(ur5, rt_msg_cond_, 10, 1, user_parameters, 0, 0);
-			std::cout << "Hopefully, the robot is now in the correct position." << std::endl;
+			//forceControl(ur5, rt_msg_cond_, 10, 1, user_parameters, 0, 0);
+			//std::cout << "Hopefully, the robot is now in the correct position." << std::endl;
 		}
-		
+		/*
 		std::cout << "Would you like to keep the current setup [y/n]? : ";
 		std::cin >> user_status;
 		if (user_status == 'y' || user_status == 'Y')
 		{
 			break;
-		}
+		}*/
+		break;
 	}
 }
 
@@ -278,9 +279,12 @@ int main()
 	
 	
 	// qStart -> Starting position with a desired pose and good range of motion in current laboratory setup
-	double qStart[6] = {0.5728, -2.5034, -2.3017, -1.4641, -1.0611, 0.4345};
+	double qStart[6] = {0.4825, -2.1443, -1.9878, -2.1143, -1.3179, 0.0989};
+	//{0.1535, -2.5839, -2.0992, -1.5396, -1.3105, 0.1555};
+	//{-0.1554, -2.2359, -1.8301, -2.2104, -1.4632, 0.4756};
+	//
 	moveSimpleJointDirect(&ur5, &rt_msg_cond_, qStart, 1, 1);
-	
+	/*
 	char user_ready;
 	while(user_ready != 'y' || user_ready != 'Y')
 	{
@@ -295,7 +299,7 @@ int main()
 			moveSimpleJointDirect(&ur5, &rt_msg_cond_, qStart, 1, 1);
 			break;
 		}
-	}
+	}*/
 	
 	// FORCE CONTROL
 	int force_mode = 1;
