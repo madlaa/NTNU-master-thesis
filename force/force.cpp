@@ -6,7 +6,7 @@
 int initFT = 1;
 int iteration_sleeptime = 8000; 
 //Fastest possible hardware update rate for the UR5 is set at 8ms ~ 125 Hz equivalent to usleep(8000)
-//usleep(10000) ~ 90 Hz --> run a bit faster than double the frequency of the fastest human reaction time -- currently involuntary muscle contractions at 24ms ~ 41,6 Hz
+//usleep(10000) ~ 90 Hz --> run a bit faster than double the frequency of the fastest human reaction time -- currently involuntary muscle contractions at 24ms ~ 41,6 Hz. 
 double rawFTdata[6];
 double biasTF[3]; // Tool frame (or TCP frame)
 
@@ -194,7 +194,6 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	std::cout << "Force control initiated - starting data logging ..." << std::endl;
 	std::ofstream forcelog;
 	forcelog.open("../data/logs/forcelog", std::ofstream::out);
-	//double iteration_time = 0.008;//0.008 [ms] ~ 125 Hz || 0.011 [ms] ~  90 Hz
 	
 	//Control system for translation forces
 	double integrator_Fx = 0, integrator_Fy = 0, integrator_Fz = 0;
@@ -205,7 +204,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	double prior_error_Fx = 0, prior_error_Fy = 0, prior_error_Fz = 0;
 	double u_Fx = 0, u_Fy = 0, u_Fz = 0;
 	
-	//Control system for rotational forces
+	//Control system for rotational torques
 	double integrator_Tx = 0, integrator_Ty = 0, integrator_Tz = 0;
 	double derivator_Tx = 0, derivator_Ty = 0, derivator_Tz = 0;
 	double Kp_T = 0, Ki_T = 0, Kd_T = 0;
@@ -220,45 +219,50 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	double vw[6] = {0,0,0,0,0,0};
 
 	//End-effector tool bias: a constant mounting bias and a dynamic gravity bias.
-	double bias_tool_WF[3] = {0, 0, -0.001};//Weight of end-effector tool in world frame ('_WF').
-	double bias_tool_TF[3]; //Weight of end-effector tool in tool frame ('_TF').
-	double bias_mounting[3];
-	double biasForce[3];
-	
-	double biasTorque[3] = {rawFTdata[3], rawFTdata[4], rawFTdata[5]};
-	
-	double theta;
+	double bias_tool_WF[3] = {0, 0, -0.5886};//-0.5886[N] is the calculated gravitational force on the end-effector tool in world frame ('_WF').
+	double bias_tool_TF[3]; //Gravitational force of end-effector tool in tool frame ('_TF').
+
 	double radius_current;
 	double radius_min = 0.35;//unit [m] 
 	double radius_max = 0.7;
 	double height_min = -0.22;
 	double height_max = 0.3;
+	
+	double theta;
 	double angle_max = M_PI/2;//unit [rad]
 	
 	double correction_vector_WF[3];
    	double correction_vector_TF[3];
-   	double correction_vector_scale = 500;
-   	double correction_vector_radius_datalog[3];
-   	double correction_vector_height_datalog[3];
+   	double correction_vector_scale = 500; //Calibrations made by a healthy male with average height and weight.
+   	double radius_datalog[3];
+   	double height_datalog[3];
    	
    	double buoyancy_vector_TF[3];
    	double buoyancy_vector_WF[3];
 	
-	double startTime = ur5->rt_interface_->robot_state_->getTime();
+	double start_time = ur5->rt_interface_->robot_state_->getTime();
 	std::vector<double> sq = ur5->rt_interface_->robot_state_->getQActual();
 	vector_trans_base_tool(sq, bias_tool_WF, bias_tool_TF);
+	
+	//Static F/T mounting bias
+	double bias_mounting[3] = {rawFTdata[0]-bias_tool_TF[0], rawFTdata[1]-bias_tool_TF[1], rawFTdata[2]-bias_tool_TF[2]};
+	double bias_force[3];
+	double bias_torque[3] = {rawFTdata[3], rawFTdata[4], rawFTdata[5]};
+	
+	double forces[3];
+	double torques[3];
 	
 	int i = 0; 
 	int iter = run_time/0.008;
 	
 	//PID controller gain parameters
-	Kp = 0.005;//0.006;
-	//Ki = 0.00025;
-	//Kd = 0.0002;
+	Kp = 0.005;// Prefered between [0.005-0.006]
+	//Ki = 0; // Not prefered due to overshoot behaviour.
+	//Kd = 0; // Not prefered due to noise amplification
 	
-	Kp_T = 0.4;//0.03;
-	//Ki_T = 0.005;
-	//Kd_T = 0.0005;
+	Kp_T = 0.4;// Prefered between [0.4-0.5]
+	//Ki_T = 0; // Not prefered due to steady-state error.
+	//Kd_T = 0; // Not prefered due to noise amplification.
 	
 	gsl_matrix *R = gsl_matrix_calloc(3,3);
 	gsl_vector *O = gsl_vector_alloc(3);
@@ -267,13 +271,9 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	
 	double disturbances[6] = {0,0,0,0,0,0};
 	srand(time(NULL));
-	double randomDuration = rand() % 375 + 125;
-	double randomDisturbances[6] = {0,0,0,0,0,0};
-	
-	double testTime = 125*30; //30 seconds test periode
-	//double test_force = 2; //Newton step responce test
-	//double test_torque = 1; //Newtonmeter step responce test
-	
+	double random_duration = rand() % 375 + 125;
+	double random_disturbances[6] = {0,0,0,0,0,0};
+
 	std::cout << "======================== FORCE CONTROL ACTIVE ========================" << std::endl;
 	while(i<iter)
 	{
@@ -285,54 +285,52 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			rt_msg_cond_->wait(locker);
 		}
 		
-		double timeStamp = ur5->rt_interface_->robot_state_->getTime();
-		double elapsTime = timeStamp-startTime;
+		double time_stamp = ur5->rt_interface_->robot_state_->getTime();
+		double elaps_time = time_stamp-start_time;
 				  
 		std::vector<double> q = ur5->rt_interface_->robot_state_->getQActual();
 		//std::vector<double> qd = ur5->rt_interface_->robot_state_->getQdActual();
 		//std::vector<double> qdd_target = ur5->rt_interface_->robot_state_->getQddTarget()
 		//std::vector<double> tcp_speed = ur5->rt_interface_->robot_state_->getTcpSpeedActual();
+   		
    		tfrotype tfkin;
 		R->data=tfkin.R;
 		O->data=tfkin.O;
 		ufwdkin(&tfkin,q.data(),apar,dpar);
 		
-		bias_tool_TF[0] = bias_tool_TF[1] = bias_tool_TF[2] = 0;
+		//Update equiptment gravity component.
+		bias_tool_TF[0] = bias_tool_TF[1] = bias_tool_TF[2] = bias_force[0] = bias_force[1] = bias_force[2] = 0;
 		vector_trans_base_tool(q, bias_tool_WF, bias_tool_TF);
 		
 		for(int j=0; j<3; j++)
 		{
-			biasForce[j] = bias_mounting[j] - bias_tool_TF[j];
+			bias_force[j] = bias_mounting[j] + bias_tool_TF[j];
 		}
 		
 		
-		double Forces[3] = {rawFTdata[0]+biasForce[0], rawFTdata[1]+biasForce[1], rawFTdata[2]+biasForce[2]};
-		double Torques[3] = {rawFTdata[3]-biasTorque[0], rawFTdata[4]-biasTorque[1], rawFTdata[5]-biasTorque[2]};
+		 forces[0] = rawFTdata[0]-bias_force[0];
+		 forces[1] = rawFTdata[1]-bias_force[1];
+		 forces[2] = rawFTdata[2]-bias_force[2];
+		 
+		 torques[0] = rawFTdata[3]-bias_torque[0];
+		 torques[1] = rawFTdata[4]-bias_torque[1];
+		 torques[2] = rawFTdata[5]-bias_torque[2];
+		 //= {rawFTdata[0]-bias_force[0], rawFTdata[1]-bias_force[1], rawFTdata[2]-bias_force[2]};
+		 //= {rawFTdata[3]-bias_torque[0], rawFTdata[4]-bias_torque[1], rawFTdata[5]-bias_torque[2]};
 
-   		// Testing countdown
-		if(testTime > 0)
-		{
-			testTime -= 1;
-		}
-		if(testTime == 0)
-		{
-			break;
-		}
-		
-		
 		theta = atan2(gsl_vector_get(O,1), gsl_vector_get(O,0));
 		radius_current = sqrt(pow(gsl_vector_get(O,0), 2.0)+pow(gsl_vector_get(O,1), 2.0));
    		
-
-   		error_Fx = error_Fy = error_Fz = 0;
+		
+   		error_Fx = error_Fy = error_Fz = 0; //Unsessesary, but safety first.
    		for (int j = 0; j<6; j++)
    		{
-   			correction_vector_radius_datalog[j] = 0;
-   			correction_vector_height_datalog[j] = 0;
+   			radius_datalog[j] = 0;
+   			height_datalog[j] = 0;
    		}
    		
    		//FORCE ERROR UPDATES
-   		if(fabs(Forces[0]) < 1 && fabs(Forces[1]) < 1 && fabs(Forces[2]) < 1) // Dead-band filter, cut-off at 1N
+   		if(fabs(forces[0]) < 1 && fabs(forces[1]) < 1 && fabs(forces[2]) < 1) // Dead-band filter, cut-off at 1N
    		{
 			error_Fx = error_Fx/1.2; //Gentle step-down
 			error_Fy = error_Fy/1.2;
@@ -346,27 +344,29 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		}
 		else
 		{	
-			error_Fx = references[0] + Forces[0];
-			error_Fy = references[1] + Forces[1];
-			error_Fz = references[2] + Forces[2];
+			error_Fx = references[0] + forces[0];
+			error_Fy = references[1] + forces[1];
+			error_Fz = references[2] + forces[2];
 			
 			//SAFETY MECHANISM
 			if(radius_current > radius_max)
 			{
+				//Vector direction in WF
 				correction_vector_WF[0] = -radius_current*cos(theta);
 	   			correction_vector_WF[1] = -radius_current*sin(theta);
 	   			correction_vector_WF[2] = 0;
-	   			
+	   			//Kinematically transform into TF
 	   			correction_vector_TF[0] = correction_vector_TF[1] = correction_vector_TF[2] = 0;
 	   			vector_trans_base_tool(q, correction_vector_WF, correction_vector_TF);
+	   			//Vector magnitude in TF
+	   			radius_datalog[0] = correction_vector_TF[0]*fabs(radius_current-radius_max)*correction_vector_scale;
+	   			radius_datalog[1] = correction_vector_TF[1]*fabs(radius_current-radius_max)*correction_vector_scale;
+	   			radius_datalog[2] = correction_vector_TF[2]*fabs(radius_current-radius_max)*correction_vector_scale;
 	   			
-	   			correction_vector_radius_datalog[0] = correction_vector_TF[0]*fabs(radius_current-radius_max)*correction_vector_scale;
-	   			correction_vector_radius_datalog[1] = correction_vector_TF[1]*fabs(radius_current-radius_max)*correction_vector_scale;
-	   			correction_vector_radius_datalog[2] = correction_vector_TF[2]*fabs(radius_current-radius_max)*correction_vector_scale;
-	   			
-	   			error_Fx += correction_vector_radius_datalog[0]; //..._datalog needed for logging testresults
-	   			error_Fy += correction_vector_radius_datalog[1];
-	   			error_Fz += correction_vector_radius_datalog[2];
+	   			//..._datalog is added for result logging
+	   			error_Fx += radius_datalog[0];
+	   			error_Fy += radius_datalog[1];
+	   			error_Fz += radius_datalog[2];
 			}
 			else if(radius_current < radius_min)
 			{
@@ -377,13 +377,13 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	   			correction_vector_TF[0] = correction_vector_TF[1] = correction_vector_TF[2] = 0;
 	   			vector_trans_base_tool(q, correction_vector_WF, correction_vector_TF);
 	   			
-	   			correction_vector_radius_datalog[0] = correction_vector_TF[0]*fabs(radius_current-radius_min)*correction_vector_scale*2;
-	   			correction_vector_radius_datalog[1] = correction_vector_TF[1]*fabs(radius_current-radius_min)*correction_vector_scale*2;
-	   			correction_vector_radius_datalog[2] = correction_vector_TF[2]*fabs(radius_current-radius_min)*correction_vector_scale*2;
+	   			radius_datalog[0] = correction_vector_TF[0]*fabs(radius_current-radius_min)*correction_vector_scale*2;
+	   			radius_datalog[1] = correction_vector_TF[1]*fabs(radius_current-radius_min)*correction_vector_scale*2;
+	   			radius_datalog[2] = correction_vector_TF[2]*fabs(radius_current-radius_min)*correction_vector_scale*2;
 	   			
-	   			error_Fx += correction_vector_radius_datalog[0];
-	   			error_Fy += correction_vector_radius_datalog[1];
-	   			error_Fz += correction_vector_radius_datalog[2];
+	   			error_Fx += radius_datalog[0];
+	   			error_Fy += radius_datalog[1];
+	   			error_Fz += radius_datalog[2];
 			}
 	   		if(gsl_vector_get(O,2) > height_max)
 	   		{
@@ -394,13 +394,13 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	   			correction_vector_TF[0] = correction_vector_TF[1] = correction_vector_TF[2] = 0;
 	   			vector_trans_base_tool(q, correction_vector_WF, correction_vector_TF);
 	   			
-	   			correction_vector_height_datalog[0] = correction_vector_TF[0]*(fabs(gsl_vector_get(O,2))-fabs(height_max))*correction_vector_scale;
-	   			correction_vector_height_datalog[1] = correction_vector_TF[1]*(fabs(gsl_vector_get(O,2))-fabs(height_max))*correction_vector_scale;
-	   			correction_vector_height_datalog[2] = correction_vector_TF[2]*(fabs(gsl_vector_get(O,2))-fabs(height_max))*correction_vector_scale;
+	   			height_datalog[0] = correction_vector_TF[0]*(fabs(gsl_vector_get(O,2))-fabs(height_max))*correction_vector_scale;
+	   			height_datalog[1] = correction_vector_TF[1]*(fabs(gsl_vector_get(O,2))-fabs(height_max))*correction_vector_scale;
+	   			height_datalog[2] = correction_vector_TF[2]*(fabs(gsl_vector_get(O,2))-fabs(height_max))*correction_vector_scale;
 	   			
-	   			error_Fx += correction_vector_height_datalog[0];
-	   			error_Fy += correction_vector_height_datalog[1];
-	   			error_Fz += correction_vector_height_datalog[2];
+	   			error_Fx += height_datalog[0];
+	   			error_Fy += height_datalog[1];
+	   			error_Fz += height_datalog[2];
 	   		}
 	   		else if(gsl_vector_get(O,2) < height_min)
 	   		{
@@ -411,19 +411,19 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 	   			correction_vector_TF[0] = correction_vector_TF[1] = correction_vector_TF[2] = 0;
 	   			vector_trans_base_tool(q, correction_vector_WF, correction_vector_TF);
 	   			
-	   			correction_vector_height_datalog[0] = correction_vector_TF[0]*(fabs(gsl_vector_get(O,2))-fabs(height_min))*correction_vector_scale;
-	   			correction_vector_height_datalog[1] = correction_vector_TF[1]*(fabs(gsl_vector_get(O,2))-fabs(height_min))*correction_vector_scale;
-	   			correction_vector_height_datalog[2] = correction_vector_TF[2]*(fabs(gsl_vector_get(O,2))-fabs(height_min))*correction_vector_scale;
+	   			height_datalog[0] = correction_vector_TF[0]*(fabs(gsl_vector_get(O,2))-fabs(height_min))*correction_vector_scale;
+	   			height_datalog[1] = correction_vector_TF[1]*(fabs(gsl_vector_get(O,2))-fabs(height_min))*correction_vector_scale;
+	   			height_datalog[2] = correction_vector_TF[2]*(fabs(gsl_vector_get(O,2))-fabs(height_min))*correction_vector_scale;
 	   			
-	   			error_Fx += correction_vector_height_datalog[0];
-	   			error_Fy += correction_vector_height_datalog[1];
-	   			error_Fz += correction_vector_height_datalog[2];
+	   			error_Fx += height_datalog[0];
+	   			error_Fy += height_datalog[1];
+	   			error_Fz += height_datalog[2];
 	   		}
 		}
 		
 		error_Tx = error_Ty = error_Tz = 0;
 		//TORQUE ERROR UPDATES
-		if(fabs(Torques[0]) < 0.5 && fabs(Torques[1]) < 0.5 && fabs(Torques[2]) < 0.5)
+		if(fabs(torques[0]) < 0.5 && fabs(torques[1]) < 0.5 && fabs(torques[2]) < 0.5)
 		{
 			error_Tx = error_Tx/1.2; //Gentle step-down
 			error_Ty = error_Ty/1.2;
@@ -435,10 +435,12 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		}
 		else
 		{
-			error_Tx = Torques[0];
-			error_Ty = Torques[1];
-	   		error_Tz = Torques[2];
+			error_Tx = torques[0];
+			error_Ty = torques[1];
+	   		error_Tz = torques[2];
 	   		
+	   		
+	   		//NB! - Not properly tested, therefore not documented in master thesis.
 	   		//SAFETY MECHANISM
 	   		/*
 	   		if(fabs(q[3]) > fabs(sq[3])+angle_max)
@@ -449,14 +451,15 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			{
 				error_Ty += copysign((fabs(q[4])-(fabs(sq[4])+angle_max))*2, -q[4]);
 			}
-			*/
+			
 			if(fabs(q[5]) > fabs(sq[5])+angle_max)
 			{
 				error_Tz += copysign((fabs(q[5])-(fabs(sq[5])+angle_max))*3, -q[5]);
-			}
+			}*/
+		
 		}
 
-
+		
 		//SAFETY MECHANISM 
 		if(fabs(error_Fx) > 50 || fabs(error_Fy) > 50 || fabs(error_Fz) > 50)
 		{
@@ -483,13 +486,13 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		}
 		
 		//GENERATING RANDOM DISTURANCES
-		if (force_mode == 3 && randomDuration < 1) 
+		if (force_mode == 3 && random_duration < 1) 
 		{
 			for (int j = 0; j<6; j++)
 			{
-				randomDisturbances[j] = (rand() % 30)-15; //Force between -15 and 14 Newton 
+				random_disturbances[j] = (rand() % 30)-15; //Force between -15 and 14 Newton 
 			}
-			randomDuration = rand() % 500 + 250; //Duration between 2-4 seconds
+			random_duration = rand() % 500 + 250; //Duration between 2-4 seconds
 		}
 		
 		//=============== CONTROLLER =====================
@@ -518,6 +521,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		u_Tx = Kp_T*error_Tx + Ki_T*integrator_Tx + Kd_T*derivator_Tx;
 		u_Ty = Kp_T*error_Ty + Ki_T*integrator_Ty + Kd_T*derivator_Ty;
 		u_Tz = Kp_T*error_Tz + Ki_T*integrator_Tz + Kd_T*derivator_Tz;
+		
 		
 		//SAFETY MECHANISM 
 		if(fabs(u_Fx) > 5 || fabs(u_Fy) > 5 || fabs(u_Fz) > 5)
@@ -563,6 +567,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			buoyancy_vector_WF[2] = user_parameters[1];
 			vector_trans_base_tool(q, buoyancy_vector_WF, buoyancy_vector_TF);
 			
+			
 			for (int k = 0; k<3; k++)
 			{
 				references[k] = buoyancy_vector_TF[k];
@@ -577,15 +582,15 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		}
 		if(force_mode == 3) //Random mode
 		{
-			for (int j = 0; j<3; j++) //Random torque is disabled
+			for (int j = 0; j<3; j++) //Random torque is disabled due to safety conserns
 			{
-				if((copysign(1.0, disturbances[j]) != copysign(1.0, randomDisturbances[j])) && (fabs(disturbances[j]) > 0.001))
+				if((copysign(1.0, disturbances[j]) != copysign(1.0, random_disturbances[j])) && (fabs(disturbances[j]) > 0.001))
 				{
 					disturbances[j] = disturbances[j]/1.2; //Gentle step-down
 				}
-				else if(disturbances[j] < (randomDisturbances[j]*user_parameters[j]))
+				else if(disturbances[j] < (random_disturbances[j]*user_parameters[j]))
 				{
-					disturbances[j] += fabs((randomDisturbances[j]*user_parameters[j])-disturbances[j])/fabs((randomDisturbances[j]*user_parameters[j])); //Gentle step-up
+					disturbances[j] += fabs((random_disturbances[j]*user_parameters[j])-disturbances[j])/fabs((random_disturbances[j]*user_parameters[j])); //Gentle step-up
 				}
 				references[j] = disturbances[j];
 			}
@@ -597,7 +602,7 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 			vw[4] = u_Ty;
 			vw[5] = u_Tz;
 			
-			randomDuration -= 1;
+			random_duration -= 1;
 		}
 		if(force_mode == 4) //Resistance mode
 		{	
@@ -646,7 +651,8 @@ void forceControl(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int run_
 		
 		
 		//DATA LOGGING
-		forcelog << elapsTime << " " << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " " << q[4] << " " << q[5] << " " << rawFTdata[0] << " " << rawFTdata[1] << " " << rawFTdata[2] << " " << rawFTdata[3] << " " << rawFTdata[4] << " " << rawFTdata[5] << " " << Forces[0] << " " << Forces[1] << " " << Forces[2] << " " << Torques[0] << " " << Torques[1] << " " << Torques[2] << " " << error_Fx << " " << error_Fy << " " << error_Fz << " " << error_Tx << " " << error_Ty << " " << error_Tz << " " << u_Fx << " " << u_Fy << " " << u_Fz << " " << u_Tx << " " << u_Ty << " " << u_Tz << " " << biasForce[0] << " " << biasForce[1] << " " << biasForce[2] << " "  << bias_tool_TF[0] << " " << bias_tool_TF[1] << " " << bias_tool_TF[2] << " " << gsl_vector_get(O,0) << " " << gsl_vector_get(O,1) << " " << gsl_vector_get(O,2) << " " << disturbances[0] << " " << disturbances[1] << " " << disturbances[2] << " " << buoyancy_vector_TF[0] << " " << buoyancy_vector_TF[1] << " " << buoyancy_vector_TF[2] << " " << correction_vector_radius_datalog[0] << " " << correction_vector_radius_datalog[1] << " " << correction_vector_radius_datalog[2] << " " << correction_vector_height_datalog[0] << " " << correction_vector_height_datalog[1] << " " << correction_vector_height_datalog[2] << " " << gsl_matrix_get(R,0,0) << " " << gsl_matrix_get(R,0,1) << " " << gsl_matrix_get(R,0,2) << " " << gsl_matrix_get(R,1,0) << " " << gsl_matrix_get(R,1,1) << " " << gsl_matrix_get(R,1,2) << " " << gsl_matrix_get(R,2,0) << " " << gsl_matrix_get(R,2,1) << " " << gsl_matrix_get(R,2,2) << " " << "\n";
+		//Currently 67 variables
+		forcelog << elaps_time << " " << speed[0] << " " << speed[1] << " " << speed[2] << " " << speed[3] << " " << speed[4] << " " << speed[5] << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " " << q[4] << " " << q[5] << " " << rawFTdata[0] << " " << rawFTdata[1] << " " << rawFTdata[2] << " " << rawFTdata[3] << " " << rawFTdata[4] << " " << rawFTdata[5] << " " << forces[0] << " " << forces[1] << " " << forces[2] << " " << torques[0] << " " << torques[1] << " " << torques[2] << " " << error_Fx << " " << error_Fy << " " << error_Fz << " " << error_Tx << " " << error_Ty << " " << error_Tz << " " << u_Fx << " " << u_Fy << " " << u_Fz << " " << u_Tx << " " << u_Ty << " " << u_Tz << " " << bias_force[0] << " " << bias_force[1] << " " << bias_force[2] << " "  << bias_tool_TF[0] << " " << bias_tool_TF[1] << " " << bias_tool_TF[2] << " " << gsl_vector_get(O,0) << " " << gsl_vector_get(O,1) << " " << gsl_vector_get(O,2) << " " << disturbances[0] << " " << disturbances[1] << " " << disturbances[2] << " " << buoyancy_vector_TF[0] << " " << buoyancy_vector_TF[1] << " " << buoyancy_vector_TF[2] << " " << radius_datalog[0] << " " << radius_datalog[1] << " " << radius_datalog[2] << " " << height_datalog[0] << " " << height_datalog[1] << " " << height_datalog[2] << " " << gsl_matrix_get(R,0,0) << " " << gsl_matrix_get(R,0,1) << " " << gsl_matrix_get(R,0,2) << " " << gsl_matrix_get(R,1,0) << " " << gsl_matrix_get(R,1,1) << " " << gsl_matrix_get(R,1,2) << " " << gsl_matrix_get(R,2,0) << " " << gsl_matrix_get(R,2,1) << " " << gsl_matrix_get(R,2,2) << " " << "\n";
 		
 		
 		i = i+1;

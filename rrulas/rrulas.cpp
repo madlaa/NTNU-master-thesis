@@ -146,17 +146,15 @@ void moveSimpleCartDirect(UrDriver *ur5, std::condition_variable *rt_msg_cond_, 
 
 void introductionProcedure(UrDriver *ur5, std::condition_variable *rt_msg_cond_, int *force_mode, double *user_parameters, double *force_threshold, double *torque_threshold)
 {	
+	//DEFAULT VALUES
+	for (int j=0; j<6; j++)
+	{
+		user_parameters[j] = 0; //Fx, Fy, Fz, Tx, Ty, Tz
+	}
 	char user_status;
 	
 	while(user_status != 'y' || user_status != 'Y')
 	{
-		//DEFAULT VALUES
-		*force_mode = 1;
-		for (int j=0; j<6; j++)
-		{
-			user_parameters[j] = 0; //Fx, Fy, Fz, Tx, Ty, Tz
-		}
-	
 		std::cout << std::endl;
 		std::cout << "========== ROBOTIC REHABILITATION OF UPPER-LIMB AFTER STROKE - 'rrulaf' ==========" << std::endl;
 		std::cout << std::endl;
@@ -169,13 +167,13 @@ void introductionProcedure(UrDriver *ur5, std::condition_variable *rt_msg_cond_,
 		std::cout << std::endl;
 		std::cout << "Please enter the desired force mode. : ";
 		std::cin >> *force_mode;
-		if (*force_mode < 0 || *force_mode > 5)
+	
+		if(*force_mode != 1 || *force_mode != 2 || *force_mode != 3 || *force_mode != 4 || *force_mode != 5)
 		{
-			std::cout << std::endl;
-			std::cout << "ERROR: Invalid input --> restarting ..." << std::endl;
-			std::cout << std::endl;
-			continue;
+			std::cout << "ERROR: Invalid input --> please enter a valid mode..." << std::endl;
+			std::cin.clear();
 		}
+		
 		if (*force_mode == 2) //Buoyancy mode
 		{
 			std::cout << "========== BUOYANCY MODE ==========" << std::endl;
@@ -189,7 +187,7 @@ void introductionProcedure(UrDriver *ur5, std::condition_variable *rt_msg_cond_,
 				user_parameters[1] = 0;
 			}
 		}
-		if (*force_mode == 3) //Random mode, torque disabled
+		if (*force_mode == 3) //Random mode, random torque disabled due to safety conserns
 		{
 			std::cout << "========== RANDOM MODE ==========" << std::endl;
 			std::cout << "Please enter a desired disturbance scale between 0-100[%] for all axis." << std::endl;
@@ -234,18 +232,18 @@ void introductionProcedure(UrDriver *ur5, std::condition_variable *rt_msg_cond_,
 		if (*force_mode == 5) //2-plane mode
 		{
 			std::cout << "========== 2-PLANE MODE ==========" << std::endl;
-			std::cout << "Move the robot to the desired staring position. It will be compliant for the next 10 seconds. " << std::endl;
-			//forceControl(ur5, rt_msg_cond_, 10, 1, user_parameters, 0, 0);
-			//std::cout << "Hopefully, the robot is now in the correct position." << std::endl;
+			std::cout << "Move the end-effector to the desired staring position. The robot will be compliant for the next 10 seconds. " << std::endl;
+			forceControl(ur5, rt_msg_cond_, 10, 1, user_parameters, 0, 0);
+			std::cout << "Hopefully, the robot is now in the correct position." << std::endl;
 		}
-		/*
+		
+		std::cout << std::endl;
 		std::cout << "Would you like to keep the current setup [y/n]? : ";
 		std::cin >> user_status;
 		if (user_status == 'y' || user_status == 'Y')
 		{
 			break;
-		}*/
-		break;
+		}
 	}
 }
 
@@ -269,54 +267,60 @@ int main()
 	}	
 	std::cout << "Data received!" << std::endl;
 	
-	
+	//GUI
+	std::cout << std::endl;
+	std::cout << std::endl;
+	std::cout << std::endl;
+	std::cout << "======================== Welcome to the robotic rehabiliation system! ========================" << std::endl;
+	std::cout << std::endl;
+	std::cout << std::endl;
+	std::cout << std::endl;
 	//Displays current pose
+	/*
 	double q[6];
 	getq(&ur5, &rt_msg_cond_, q);	
 	char TargetString[200];
 	sprintf(TargetString, "movel([%.4f, %.4f, %.4f, %.4f, %.4f, %.4f], %.4f, %.4f)\n", q[0], q[1], q[2], q[3], q[4], q[5], 0.2, 0.2);
 	std::cout << "Current pose is: " << TargetString << std::endl;
+	*/
 	
+	//q_start -> Starting position with a desired pose and good range of motion in current laboratory setup
+	double q_start[6] = {0.2091, -2.3496, -2.1545, -1.7428, -1.4132, 0.4215};
 	
-	// qStart -> Starting position with a desired pose and good range of motion in current laboratory setup
-	double qStart[6] = {0.4825, -2.1443, -1.9878, -2.1143, -1.3179, 0.0989};
-	//{0.1535, -2.5839, -2.0992, -1.5396, -1.3105, 0.1555};
-	//{-0.1554, -2.2359, -1.8301, -2.2104, -1.4632, 0.4756};
-	//
-	moveSimpleJointDirect(&ur5, &rt_msg_cond_, qStart, 1, 1);
-	/*
 	char user_ready;
 	while(user_ready != 'y' || user_ready != 'Y')
 	{
 		std::cout << "======================== WARNING! ========================" << std::endl;
-		std::cout << "The robot will now move to a starting position. Make sure it is safe for the robot to operate inside the workspace. \n Is the area clear [y/n]? : ";
+		std::cout << "The robot will now move to a starting position. Make sure it is safe for the robot to operate inside the workspace. The external controller is not active. \n Is the area clear [y/n]? : ";
 		std::cin >> user_ready;
 		if (user_ready == 'y' || user_ready == 'Y')
 		{
 			// MOVE TO STARING POINT
 			std::cout << "======================== POSITION CONTROL ACTIVE ========================" << std::endl;
 			std::cout << "Moving to staring location... ";
-			moveSimpleJointDirect(&ur5, &rt_msg_cond_, qStart, 1, 1);
+			moveSimpleJointDirect(&ur5, &rt_msg_cond_, q_start, 1, 1);
 			break;
 		}
-	}*/
+	}
 	
 	// FORCE CONTROL
 	int force_mode = 1;
 	double force_threshold = 0;
 	double torque_threshold = 0;
 	double user_parameters[6] = {0,0,0,0,0,0}; //Fx, Fy, Fz, Tx, Ty, Tz
+	double safety_timeout = 200; //[s]
 	
 	introductionProcedure(&ur5, &rt_msg_cond_, &force_mode, user_parameters, &force_threshold, &torque_threshold);
-	
+
 	std::cout << "Initializing force control... \n" << std::endl;
 	pthread_t forceID;
-	forceControl(&ur5, &rt_msg_cond_, 200, force_mode, user_parameters, force_threshold, torque_threshold);
+	forceControl(&ur5, &rt_msg_cond_, safety_timeout, force_mode, user_parameters, force_threshold, torque_threshold);
 	
 	usleep(1000);
 	std::cout << "Shutting down force control. \n";
-	stopFT(&forceID);
 	ur5.halt();
+	stopFT(&forceID);
+	
 	std::cout << "Disconnected!\n";
 	return 0;
 }
